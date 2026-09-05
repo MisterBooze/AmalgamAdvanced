@@ -57,7 +57,7 @@ MAKE_HOOK(CHLClient_CreateMove, U::Memory.GetVirtual(I::Client, 21), void,
 	F::Ticks.End(pLocal, pCmd);
 		F::CritHack.Run(pLocal, pWeapon, pCmd);
 		F::NoSpread.Run(pLocal, pWeapon, pCmd);
-		F::Misc.RunPost(pLocal, pCmd);
+		F::Misc.RunPost(pLocal, pCmd, *pSendPacket);
 		F::PacketManip.Run(pLocal, pWeapon, pCmd, pSendPacket);
 		F::Ticks.CreateMove(pLocal, pWeapon, pCmd, pSendPacket);
 		F::AntiAim.Run(pLocal, pWeapon, pCmd, *pSendPacket);

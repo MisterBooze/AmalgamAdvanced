@@ -131,3 +131,25 @@ TraceType_t CTraceFilterWorldAndPropsOnly::GetTraceType() const
 {
 	return TRACE_EVERYTHING_FILTER_PROPS;
 }
+bool CTraceFilterWorldAndBrushOnly::ShouldHitEntity(IHandleEntity* pServerEntity, int nContentsMask)
+{
+	if (!pServerEntity || pServerEntity == pSkip)
+		return false;
+	if (pServerEntity->GetRefEHandle().GetSerialNumber() == (1 << 15))
+		return I::ClientEntityList->GetClientEntity(0) != pSkip;
+
+	auto pEntity = reinterpret_cast<CBaseEntity*>(pServerEntity);
+	if (iTeam == -1) iTeam = pSkip ? pSkip->m_iTeamNum() : 0;
+
+	// Skip trigger/non-solid brush volumes — invisible geometry that movement
+	// tech (TextureBug, AutoAlign, AirStuck) should pass through.
+	if (pEntity->m_usSolidFlags() & (FSOLID_TRIGGER | FSOLID_NOT_SOLID))
+		return false;
+
+	return true;
+}
+
+TraceType_t CTraceFilterWorldAndBrushOnly::GetTraceType() const
+{
+	return TRACE_EVERYTHING_FILTER_PROPS;
+}

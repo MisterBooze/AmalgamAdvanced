@@ -69,3 +69,12 @@ public:
 
 	int iTeam = -1;
 };
+class CTraceFilterWorldAndBrushOnly : public ITraceFilter
+{
+public:
+	bool ShouldHitEntity(IHandleEntity* pServerEntity, int nContentsMask) override;
+	TraceType_t GetTraceType() const override;
+	CBaseEntity* pSkip = nullptr;
+
+	int iTeam = -1;
+};

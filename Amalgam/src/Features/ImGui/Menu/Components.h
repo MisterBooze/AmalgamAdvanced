@@ -2539,11 +2539,13 @@ namespace ImGui
 			SetCursorPos(vOriginalPos);
 		}
 
-		auto vTable = tBind.m_iType == BindEnum::Key ? WidgetTable(3, H::Draw.Scale(40), { H::Draw.Scale(80), H::Draw.Scale(104), H::Draw.Scale(116) + 1 }) : WidgetTable(2, H::Draw.Scale(40));
+		auto vTable = tBind.m_iType == BindEnum::Key ? WidgetTable(3, H::Draw.Scale(40), { H::Draw.Scale(80), H::Draw.Scale(104), H::Draw.Scale(116) + 1 })
+		            : tBind.m_iType == BindEnum::Health ? WidgetTable(3, H::Draw.Scale(40))
+		            : WidgetTable(2, H::Draw.Scale(40));
 
 		if (BeginWidgetTable(0, vTable))
 		{
-			FDropdown("Type", &tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc" }, {}, FDropdownEnum::None, 0, "None", &bHovered);
+			FDropdown("Type", &tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc", "Health", "Movement", "Condition" }, {}, FDropdownEnum::None, 0, "None", &bHovered);
 			bLastHovered |= bHovered;
 		} EndChild();
 
@@ -2556,18 +2558,94 @@ namespace ImGui
 			case BindEnum::WeaponType: FDropdown("Weapon type", &tBind.m_iInfo, { "Hitscan", "Projectile", "Melee", "Throwable" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
 			case BindEnum::ItemSlot: FDropdown("Item slot", &tBind.m_iInfo, { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
 			case BindEnum::Misc: FDropdown("Misc", &tBind.m_iInfo, { "Spectated", "Spectated 1st", "Spectated 3rd", "##Divider", "Zoomed", "Aiming" }, {}, FDropdownEnum::None); break;
+			case BindEnum::Health: FDropdown("Condition", &tBind.m_iInfo, { "Below %", "Above %" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+			case BindEnum::Movement: FDropdown("State", &tBind.m_iInfo, { "Moving", "In air", "Ducking", "In water" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+			case BindEnum::Condition: FDropdown("Condition", &tBind.m_iInfo, { "Burning", "Cloaked", "Disguised", "Ubered", "Overhealed", "Bleeding", "Stunned", "Taunting", "Has ammo" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
 			}
 			bLastHovered |= bHovered;
 		} EndChild();
 
+		// 3rd column: key for Key-type, threshold slider for Health-type
 		if (vTable.size() == 3)
 		{
 			if (BeginWidgetTable(2, vTable))
 			{
-				FKeybind("Key", tBind.m_iKey, FKeybindEnum::None, { Vars::Menu::PrimaryKey[DEFAULT_BIND], Vars::Menu::SecondaryKey[DEFAULT_BIND] }, { 0, 40 }, 0, &bHovered);
+				if (tBind.m_iType == BindEnum::Key)
+				{
+					FKeybind("Key", tBind.m_iKey, FKeybindEnum::None, { Vars::Menu::PrimaryKey[DEFAULT_BIND], Vars::Menu::SecondaryKey[DEFAULT_BIND] }, { 0, 40 }, 0, &bHovered);
+				}
+				else if (tBind.m_iType == BindEnum::Health)
+				{
+					FSlider("Threshold %", &tBind.m_iInfoAux, 0, 100, 1, "%i%%", FSliderEnum::None);
+				}
 				bLastHovered |= bHovered;
 			} EndChild();
 		}
+
+		// ── AND condition ─────────────────────────────────────────────────────
+		{
+			auto vAndTable = WidgetTable(2, H::Draw.Scale(40));
+
+			if (BeginWidgetTable(0, vAndTable))
+			{
+				int iAndEnabled = tBind.m_bAndEnabled;
+				FDropdown("AND", &iAndEnabled, { "Disabled", "Enabled" }, {}, FDropdownEnum::None, 0, "None", &bHovered);
+				tBind.m_bAndEnabled = iAndEnabled;
+				bLastHovered |= bHovered;
+			} EndChild();
+
+			if (BeginWidgetTable(1, vAndTable))
+			{
+				if (tBind.m_bAndEnabled)
+				{
+					int iAndNot = tBind.m_bAndNot;
+					FDropdown("AND while", &iAndNot, { "Active", "Not active" }, {}, FDropdownEnum::None, 0, "None", &bHovered);
+					tBind.m_bAndNot = iAndNot;
+					bLastHovered |= bHovered;
+				}
+			} EndChild();
+		}
+
+		if (tBind.m_bAndEnabled)
+		{
+			auto vAndTypeTable = tBind.m_iAndType == BindEnum::Health
+				? WidgetTable(3, H::Draw.Scale(40))
+				: WidgetTable(2, H::Draw.Scale(40));
+
+			if (BeginWidgetTable(0, vAndTypeTable))
+			{
+				FDropdown("AND type", &tBind.m_iAndType,
+					{ "Key", "Class", "Weapon type", "Item slot", "Misc", "Health", "Movement", "Condition" },
+					{}, FDropdownEnum::None, 0, "None", &bHovered);
+				bLastHovered |= bHovered;
+			} EndChild();
+
+			if (BeginWidgetTable(1, vAndTypeTable))
+			{
+				switch (tBind.m_iAndType)
+				{
+				case BindEnum::Key:        FDropdown("AND behavior",  &tBind.m_iAndInfo, { "Hold", "Toggle", "Double click" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::Class:      FDropdown("AND class",     &tBind.m_iAndInfo, { "Scout", "Soldier", "Pyro", "Demoman", "Heavy", "Engineer", "Medic", "Sniper", "Spy" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::WeaponType: FDropdown("AND weapon",    &tBind.m_iAndInfo, { "Hitscan", "Projectile", "Melee", "Throwable" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::ItemSlot:   FDropdown("AND slot",      &tBind.m_iAndInfo, { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::Misc:       FDropdown("AND misc",      &tBind.m_iAndInfo, { "Spectated", "Spectated 1st", "Spectated 3rd", "##Divider", "Zoomed", "Aiming" }, {}, FDropdownEnum::None); break;
+				case BindEnum::Health:     FDropdown("AND condition",  &tBind.m_iAndInfo, { "Below %", "Above %" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::Movement:   FDropdown("AND state",     &tBind.m_iAndInfo, { "Moving", "In air", "Ducking", "In water" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				case BindEnum::Condition:  FDropdown("AND condition",  &tBind.m_iAndInfo, { "Burning", "Cloaked", "Disguised", "Ubered", "Overhealed", "Bleeding", "Stunned", "Taunting", "Has ammo" }, {}, FDropdownEnum::None, 0, "None", &bHovered); break;
+				}
+				bLastHovered |= bHovered;
+			} EndChild();
+
+			if (vAndTypeTable.size() == 3)
+			{
+				if (BeginWidgetTable(2, vAndTypeTable))
+				{
+					FSlider("AND %", &tBind.m_iAndInfoAux, 0, 100, 1, "%i%%", FSliderEnum::None);
+					bLastHovered |= bHovered;
+				} EndChild();
+			}
+		}
+		// ──────────────────────────────────────────────────────────────────────
 
 		if (!Disabled && iBind != DEFAULT_BIND && iBind < F::Binds.m_vBinds.size())
 		{
@@ -2575,12 +2653,18 @@ namespace ImGui
 
 			// don't completely override to retain misc info
 			auto& _tBind = F::Binds.m_vBinds[iBind];
-			_tBind.m_iType = tBind.m_iType;
-			_tBind.m_iInfo = tBind.m_iInfo;
-			_tBind.m_iKey = tBind.m_iKey;
-			_tBind.m_bEnabled = tBind.m_bEnabled;
+			_tBind.m_iType       = tBind.m_iType;
+			_tBind.m_iInfo       = tBind.m_iInfo;
+			_tBind.m_iInfoAux    = tBind.m_iInfoAux;
+			_tBind.m_iKey        = tBind.m_iKey;
+			_tBind.m_bEnabled    = tBind.m_bEnabled;
 			_tBind.m_iVisibility = tBind.m_iVisibility;
-			_tBind.m_bNot = tBind.m_bNot;
+			_tBind.m_bNot        = tBind.m_bNot;
+			_tBind.m_bAndEnabled = tBind.m_bAndEnabled;
+			_tBind.m_iAndType    = tBind.m_iAndType;
+			_tBind.m_iAndInfo    = tBind.m_iAndInfo;
+			_tBind.m_iAndInfoAux = tBind.m_iAndInfoAux;
+			_tBind.m_bAndNot     = tBind.m_bAndNot;
 		}
 
 		switch (FNV1A::Hash32(sType))

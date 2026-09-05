@@ -119,6 +119,22 @@ namespace G
 	inline std::vector<DrawSwept_t> SweptStorage = {};
 	inline std::vector<DrawTriangle_t> TriangleStorage = {};
 
+	// ── Aletherium globals ─────────────────────────────────────────────────
+	// FakePOV: smoothed camera-angle offset published by CFakePOV::Draw each
+	// frame and consumed by the CPrediction::GetLocalViewAngles hook so the
+	// recorded demo sees the fake direction without touching live aim.
+	inline Vec3 RealViewAngles = {};   // stashed real view each CreateMove
+	inline Vec3 FakePOVOffset  = {};   // smoothed offset (pitch, yaw, 0)
+	inline bool FakePOVActive  = false;// true while the offset is non-trivial
+
+	// FlipWorld: set each frame by the Aletherium Weather/Misc run to gate the
+	// CFlipWorld::Render call (feature toggle + local-alive check folded in).
+	inline bool FlipWorldActive = false;
+
+	// Steam persona name cached once on first game-state update (used by DiscordRPC).
+	inline std::string g_Username = "User";
+	// ───────────────────────────────────────────────────────────────────────
+
 	inline int& RandomSeed()
 	{
 		static auto& pRandomSeed = *reinterpret_cast<int*>(U::Memory.RelToAbs(S::RandomSeed()));

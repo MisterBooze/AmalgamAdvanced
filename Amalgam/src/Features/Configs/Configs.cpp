@@ -412,12 +412,18 @@ bool CConfigs::SaveConfig(const std::string& sConfigName, bool bNotify)
 				SaveJson(tChild, "Name", tBind.m_sName);
 				SaveJson(tChild, "Type", tBind.m_iType);
 				SaveJson(tChild, "Info", tBind.m_iInfo);
+				SaveJson(tChild, "InfoAux", tBind.m_iInfoAux);
 				SaveJson(tChild, "Key", tBind.m_iKey);
 				SaveJson(tChild, "Enabled", tBind.m_bEnabled);
 				SaveJson(tChild, "Visibility", tBind.m_iVisibility);
 				SaveJson(tChild, "Not", tBind.m_bNot);
 				SaveJson(tChild, "Active", tBind.m_bActive);
 				SaveJson(tChild, "Parent", tBind.m_iParent);
+				SaveJson(tChild, "AndEnabled", tBind.m_bAndEnabled);
+				SaveJson(tChild, "AndType", tBind.m_iAndType);
+				SaveJson(tChild, "AndInfo", tBind.m_iAndInfo);
+				SaveJson(tChild, "AndInfoAux", tBind.m_iAndInfoAux);
+				SaveJson(tChild, "AndNot", tBind.m_bAndNot);
 
 				tSub.put_child(std::to_string(iID), tChild);
 			}
@@ -525,12 +531,18 @@ bool CConfigs::LoadConfig(const std::string& sConfigName, bool bNotify)
 				LoadJson(tChild, "Name", tBind.m_sName);
 				LoadJson(tChild, "Type", tBind.m_iType);
 				LoadJson(tChild, "Info", tBind.m_iInfo);
+				LoadJson(tChild, "InfoAux", tBind.m_iInfoAux);  // defaults to 50 if missing (old config)
 				LoadJson(tChild, "Key", tBind.m_iKey);
 				LoadJson(tChild, "Enabled", tBind.m_bEnabled);
 				LoadJson(tChild, "Visibility", tBind.m_iVisibility);
 				LoadJson(tChild, "Not", tBind.m_bNot);
 				LoadJson(tChild, "Active", tBind.m_bActive);
 				LoadJson(tChild, "Parent", tBind.m_iParent);
+				LoadJson(tChild, "AndEnabled", tBind.m_bAndEnabled);  // defaults to false if missing
+				LoadJson(tChild, "AndType", tBind.m_iAndType);
+				LoadJson(tChild, "AndInfo", tBind.m_iAndInfo);
+				LoadJson(tChild, "AndInfoAux", tBind.m_iAndInfoAux);  // defaults to 50 if missing
+				LoadJson(tChild, "AndNot", tBind.m_bAndNot);
 				if (F::Binds.m_vBinds.size() == tBind.m_iParent)
 					tBind.m_iParent = DEFAULT_BIND - 1; // prevent infinite loop
 

@@ -29,3 +29,8 @@ MAKE_HOOK(CAttributeManager_AttribHookInt, S::CAttributeManager_AttribHookInt(),
 
 	return CALL_ORIGINAL(value, name, econent, buffer, isGlobalConstString);
 }
+// Stub for Aletherium's sheen-colour hook — our project doesn't have the full
+// implementation; silently unavailable (same behavior as when pattern scan fails).
+void InstallSheenColorHook()
+{
+}

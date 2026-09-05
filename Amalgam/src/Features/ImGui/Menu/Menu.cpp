@@ -76,7 +76,7 @@ void CMenu::DrawMenu()
 		RenderTwoToneBackground(flSize, {}, F::Render.Background1, F::Render.Background2, 0.f, false);
 		pDrawList->PopClipRect();
 
-		static int iTab = 0, iAimbotTab = 0, iVisualsTab = 0, iLogsTab = 0, iSettingsTab = 0;
+		static int iTab = 0, iAimbotTab = 0, iVisualsTab = 0, iLogsTab = 0, iSettingsTab = 0, iAletheriumTab = 0, iMiscTab = 0;
 		PushFont(F::Render.FontBold);
 		FTabs(
 			{
@@ -85,13 +85,14 @@ void CMenu::DrawMenu()
 				{ "VISUALS", "ESP", "MISC##", "MENU" },
 				{ "MISC" },
 				{ "LOGS", "PLAYERLIST", "SETTINGS##", "OUTPUT" },
-				{ "SETTINGS", "CONFIG", "BINDS", "MATERIALS", "MISC##" }
+				{ "SETTINGS", "CONFIG", "BINDS", "MATERIALS", "MISC##" },
+				{ "ALETHERIUM", "AIM##ale", "VISUALS##ale", "HUD##ale", "MISC##ale", "MOVEMENT##ale" }
 			},
-			{ &iTab, &iAimbotTab, nullptr, &iVisualsTab, nullptr, &iLogsTab, &iSettingsTab },
+			{ &iTab, &iAimbotTab, nullptr, &iVisualsTab, nullptr, &iLogsTab, &iSettingsTab, &iAletheriumTab },
 			{ flSize - H::Draw.Scale(16), H::Draw.Scale(36) },
 			{ H::Draw.Scale(8), H::Draw.Scale(8) + flOffset },
 			FTabsEnum::Vertical | FTabsEnum::HorizontalIcons | FTabsEnum::AlignLeft | FTabsEnum::BarLeft,
-			{ { ICON_MD_PERSON }, { ICON_MD_BOLT }, { ICON_MD_VISIBILITY }, { ICON_MD_ARTICLE }, { ICON_MD_IMPORT_CONTACTS }, { ICON_MD_SETTINGS } },
+			{ { ICON_MD_PERSON }, { ICON_MD_BOLT }, { ICON_MD_VISIBILITY }, { ICON_MD_ARTICLE }, { ICON_MD_IMPORT_CONTACTS }, { ICON_MD_SETTINGS }, { ICON_MD_STAR } },
 			{ H::Draw.Scale(10), 0 }, {},
 			{}, { H::Draw.Scale(22), 0 }
 		);
@@ -121,9 +122,10 @@ void CMenu::DrawMenu()
 				case 0: MenuAimbot(iAimbotTab); break;
 				case 1: MenuHVH(); break;
 				case 2: MenuVisuals(iVisualsTab); break;
-				case 3: MenuMisc(); break;
+					case 3: MenuMisc(); break;
 				case 4: MenuLogs(iLogsTab); break;
 				case 5: MenuSettings(iSettingsTab); break;
+				case 6: MenuAletherium(iAletheriumTab); break;
 				}
 			}
 			else
@@ -1309,16 +1311,11 @@ void CMenu::MenuVisuals(int iTab)
 	}
 }
 
-void CMenu::MenuMisc(int iTab)
+void CMenu::MenuMisc()
 {
 	using namespace ImGui;
 
-	switch (iTab)
-	{
-	// Main
-	case 0:
-	{
-		if (BeginTable("MiscTable", 2))
+	if (BeginTable("MiscTable", 2))
 		{
 			/* Column 1 */
 			TableNextColumn();
@@ -1435,9 +1432,6 @@ void CMenu::MenuMisc(int iTab)
 				} EndSection();
 			}
 			EndTable();
-		}
-		break;
-	}
 	}
 }
 
@@ -2744,7 +2738,7 @@ void CMenu::MenuSettings(int iTab)
 					if (FButton(std::format("Parent: {}", sParent).c_str(), FButtonEnum::Right | FButtonEnum::SameLine | FButtonEnum::NoUpper, { 0, 40 }))
 						bParent = 2;
 				}
-				FDropdown("Type", &tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc" }, {}, FDropdownEnum::Left);
+				FDropdown("Type", &tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc", "Health", "Movement", "Condition" }, {}, FDropdownEnum::Left);
 				switch (tBind.m_iType)
 				{
 				case BindEnum::Key: FDropdown("Behavior", &tBind.m_iInfo, { "Hold", "Toggle", "Double click" }, {}, FDropdownEnum::Right); break;
@@ -2752,6 +2746,12 @@ void CMenu::MenuSettings(int iTab)
 				case BindEnum::WeaponType: FDropdown("Weapon type", &tBind.m_iInfo, { "Hitscan", "Projectile", "Melee", "Throwable" }, {}, FDropdownEnum::Right); break;
 				case BindEnum::ItemSlot: FDropdown("Item slot", &tBind.m_iInfo, { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, {}, FDropdownEnum::Right); break;
 				case BindEnum::Misc: FDropdown("Misc", &tBind.m_iInfo, { "Spectated", "Spectated 1st", "Spectated 3rd", "##Divider", "Zoomed", "Aiming" }, {}, FDropdownEnum::Right); break;
+				case BindEnum::Health:
+					FDropdown("Condition", &tBind.m_iInfo, { "Below %", "Above %" }, {}, FDropdownEnum::Right);
+					FSlider("Threshold %", &tBind.m_iInfoAux, 0, 100, 1, "%i", FSliderEnum::Left);
+					break;
+				case BindEnum::Movement: FDropdown("State", &tBind.m_iInfo, { "Moving", "In air", "Ducking", "In water" }, {}, FDropdownEnum::Right); break;
+				case BindEnum::Condition: FDropdown("Condition", &tBind.m_iInfo, { "Burning", "Cloaked", "Disguised", "Ubered", "Overhealed", "Bleeding", "Stunned", "Taunting", "Has ammo" }, {}, FDropdownEnum::Right); break;
 				}
 			} EndChild();
 
@@ -2926,9 +2926,40 @@ void CMenu::MenuSettings(int iTab)
 							break;
 						}
 						break;
+					case BindEnum::Health:
+						sType = _tBind.m_iInfo == BindEnum::HealthEnum::BelowPercent ? "hp <" : "hp >";
+						sInfo = std::format("{}%", _tBind.m_iInfoAux);
+						break;
+					case BindEnum::Movement:
+						sType = "movement";
+						switch (_tBind.m_iInfo)
+						{
+						case BindEnum::MovementEnum::Moving:  { sInfo = "moving";   break; }
+						case BindEnum::MovementEnum::InAir:   { sInfo = "in air";   break; }
+						case BindEnum::MovementEnum::Ducking: { sInfo = "ducking";  break; }
+						case BindEnum::MovementEnum::InWater: { sInfo = "in water"; break; }
+						}
+						break;
+					case BindEnum::Condition:
+						sType = "cond";
+						switch (_tBind.m_iInfo)
+						{
+						case BindEnum::ConditionEnum::Burning:    { sInfo = "burning";    break; }
+						case BindEnum::ConditionEnum::Cloaked:    { sInfo = "cloaked";    break; }
+						case BindEnum::ConditionEnum::Disguised:  { sInfo = "disguised";  break; }
+						case BindEnum::ConditionEnum::Ubered:     { sInfo = "ubered";     break; }
+						case BindEnum::ConditionEnum::Overhealed: { sInfo = "overhealed"; break; }
+						case BindEnum::ConditionEnum::Bleeding:   { sInfo = "bleeding";   break; }
+						case BindEnum::ConditionEnum::Stunned:    { sInfo = "stunned";    break; }
+						case BindEnum::ConditionEnum::Taunting:   { sInfo = "taunting";   break; }
+						case BindEnum::ConditionEnum::HasAmmo:    { sInfo = "has ammo";   break; }
+						}
+						break;
 					}
 					if (_tBind.m_bNot && (_tBind.m_iType != BindEnum::Key || _tBind.m_iInfo == BindEnum::KeyEnum::Hold))
 						sType = std::format("not {}", sType);
+					if (_tBind.m_bAndEnabled)
+						sInfo = std::format("{} &", sInfo);
 
 					ImVec2 vOriginalPos = { H::Draw.Scale(8) + H::Draw.Scale(28) * std::min(x, 3), GetCursorPosY() + H::Draw.Scale(8) };
 
@@ -3051,7 +3082,7 @@ void CMenu::MenuSettings(int iTab)
 								_tBind.m_sName = sInput;
 						}
 
-						FDropdown("Type", &_tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc" }, {}, FDropdownEnum::Left);
+						FDropdown("Type", &_tBind.m_iType, { "Key", "Class", "Weapon type", "Item slot", "Misc", "Health", "Movement", "Condition" }, {}, FDropdownEnum::Left);
 						switch (_tBind.m_iType)
 						{
 						case BindEnum::Key: FDropdown("Behavior", &_tBind.m_iInfo, { "Hold", "Toggle", "Double click" }, {}, FDropdownEnum::Right); break;
@@ -3059,9 +3090,46 @@ void CMenu::MenuSettings(int iTab)
 						case BindEnum::WeaponType: FDropdown("Weapon type", &_tBind.m_iInfo, { "Hitscan", "Projectile", "Melee", "Throwable" }, {}, FDropdownEnum::Right); break;
 						case BindEnum::ItemSlot: FDropdown("Item slot", &_tBind.m_iInfo, { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, {}, FDropdownEnum::Right); break;
 						case BindEnum::Misc: FDropdown("Misc", &_tBind.m_iInfo, { "Spectated", "Spectated 1st", "Spectated 3rd", "##Divider", "Zoomed", "Aiming" }, {}, FDropdownEnum::Right); break;
+						case BindEnum::Health:
+							FDropdown("Condition", &_tBind.m_iInfo, { "Below %", "Above %" }, {}, FDropdownEnum::Right);
+							FSlider("Threshold %", &_tBind.m_iInfoAux, 0, 100, 1, "%i", FSliderEnum::Left);
+							break;
+						case BindEnum::Movement: FDropdown("State", &_tBind.m_iInfo, { "Moving", "In air", "Ducking", "In water" }, {}, FDropdownEnum::Right); break;
+						case BindEnum::Condition: FDropdown("Condition", &_tBind.m_iInfo, { "Burning", "Cloaked", "Disguised", "Ubered", "Overhealed", "Bleeding", "Stunned", "Taunting", "Has ammo" }, {}, FDropdownEnum::Right); break;
 						}
 						if (_tBind.m_iType == BindEnum::Key)
 							FKeybind("Key", _tBind.m_iKey);
+
+						// ── AND condition ────────────────────────────────────────────
+						{
+							int iAndEnabled = _tBind.m_bAndEnabled;
+							FDropdown("AND", &iAndEnabled, { "Disabled", "Enabled" }, {}, FDropdownEnum::Left);
+							_tBind.m_bAndEnabled = iAndEnabled;
+						}
+						if (_tBind.m_bAndEnabled)
+						{
+							FDropdown("AND type", &_tBind.m_iAndType, { "Key", "Class", "Weapon type", "Item slot", "Misc", "Health", "Movement", "Condition" }, {}, FDropdownEnum::Right);
+							switch (_tBind.m_iAndType)
+							{
+							case BindEnum::Key: FDropdown("AND behavior", &_tBind.m_iAndInfo, { "Hold", "Toggle", "Double click" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::Class: FDropdown("AND class", &_tBind.m_iAndInfo, { "Scout", "Soldier", "Pyro", "Demoman", "Heavy", "Engineer", "Medic", "Sniper", "Spy" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::WeaponType: FDropdown("AND weapon", &_tBind.m_iAndInfo, { "Hitscan", "Projectile", "Melee", "Throwable" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::ItemSlot: FDropdown("AND slot", &_tBind.m_iAndInfo, { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::Misc: FDropdown("AND misc", &_tBind.m_iAndInfo, { "Spectated", "Spectated 1st", "Spectated 3rd", "##Divider", "Zoomed", "Aiming" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::Health:
+								FDropdown("AND cond", &_tBind.m_iAndInfo, { "Below %", "Above %" }, {}, FDropdownEnum::Left);
+								FSlider("AND threshold %", &_tBind.m_iAndInfoAux, 0, 100, 1, "%i", FSliderEnum::Right);
+								break;
+							case BindEnum::Movement: FDropdown("AND state", &_tBind.m_iAndInfo, { "Moving", "In air", "Ducking", "In water" }, {}, FDropdownEnum::Left); break;
+							case BindEnum::Condition: FDropdown("AND cond", &_tBind.m_iAndInfo, { "Burning", "Cloaked", "Disguised", "Ubered", "Overhealed", "Bleeding", "Stunned", "Taunting", "Has ammo" }, {}, FDropdownEnum::Left); break;
+							}
+							{
+								int iAndNot = _tBind.m_bAndNot;
+								FDropdown("AND while", &iAndNot, { "Active", "Not active" }, {}, FDropdownEnum::Right);
+								_tBind.m_bAndNot = iAndNot;
+							}
+						}
+						// ─────────────────────────────────────────────────────────────
 
 						PopStyleVar();
 						EndPopup();
@@ -3524,6 +3592,405 @@ void CMenu::MenuSettings(int iTab)
 	}
 }
 
+void CMenu::MenuAletherium(int iTab)
+{
+	using namespace ImGui;
+
+	switch (iTab)
+	{
+	// ── AIMBOT ────────────────────────────────────────────────────────────
+	case 0:
+	{
+		if (BeginTable("AletheriumAimbotTable", 2))
+		{
+			/* Column 1 — Backstab */
+			TableNextColumn();
+			{
+				if (Section("Backstab"))
+				{
+					FToggle(Vars::Aletherium::Backstab::AutoBackstab, FToggleEnum::Left);
+					FDropdown(Vars::Aletherium::Backstab::AimType, FDropdownEnum::Right);
+					PushTransparent(Vars::Aletherium::Backstab::AimType.Value != Vars::Aletherium::Backstab::AimTypeEnum::Silent);
+					{
+						FSlider(Vars::Aletherium::Backstab::FOV, FSliderEnum::Left);
+					}
+					PopTransparent();
+					FToggle(Vars::Aletherium::Backstab::AutoShoot, FToggleEnum::Right);
+					FDropdown(Vars::Aletherium::Backstab::Ignore);
+				} EndSection();
+
+				if (Section("Reliability", 8))
+				{
+					FToggle(Vars::Aletherium::Backstab::AccountPing,      FToggleEnum::Left);
+					FToggle(Vars::Aletherium::Backstab::DoubleTest,        FToggleEnum::Right);
+					FToggle(Vars::Aletherium::Backstab::RemoveInterp,      FToggleEnum::Left);
+					FToggle(Vars::Aletherium::Backstab::StrictRange,       FToggleEnum::Right);
+					FToggle(Vars::Aletherium::Backstab::PredictMovement,   FToggleEnum::Left);
+					FToggle(Vars::Aletherium::Backstab::Aggressive,        FToggleEnum::Right);
+					FToggle(Vars::Aletherium::Backstab::MultiPoint,        FToggleEnum::Left);
+					FToggle(Vars::Aletherium::Backstab::ExtrapolateYaw,    FToggleEnum::Right);
+					FToggle(Vars::Aletherium::Backstab::UnstableConnection, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::Backstab::UnstableConnection.Value);
+					{
+						FSlider(Vars::Aletherium::Backstab::UnstableMaxAngle, FSliderEnum::Right);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			/* Column 2 — Cheater Detection */
+			TableNextColumn();
+			{
+				if (Section("Cheater Detection"))
+				{
+					FToggle(Vars::Aletherium::CheaterDetection::PacketChoking, FToggleEnum::Left);
+					FToggle(Vars::Aletherium::CheaterDetection::AimFlicking,   FToggleEnum::Right);
+					FToggle(Vars::Aletherium::CheaterDetection::DuckSpeed,     FToggleEnum::Left);
+					FSlider(Vars::Aletherium::CheaterDetection::MinimumChoking, FSliderEnum::Left);
+					FSlider(Vars::Aletherium::CheaterDetection::MinimumFlick,   FSliderEnum::Right);
+					FSlider(Vars::Aletherium::CheaterDetection::MaximumNoise,   FSliderEnum::Left);
+				} EndSection();
+			}
+			EndTable();
+		}
+		break;
+	}
+
+	// ── VISUALS ───────────────────────────────────────────────────────────
+	case 1:
+	{
+		if (BeginTable("AletheriumVisualsTable", 2))
+		{
+			/* Column 1 — Weather / World */
+			TableNextColumn();
+			{
+				if (Section("Weather"))
+				{
+					FDropdown(Vars::Aletherium::Weather::Precipitation, FDropdownEnum::Left);
+					FToggle(Vars::Aletherium::Weather::FlipWorld, FToggleEnum::Right);
+					switch (Vars::Aletherium::Weather::Precipitation.Value)
+					{
+					case Vars::Aletherium::Weather::PrecipitationEnum::Rain:
+						FSlider(Vars::Aletherium::Weather::RainAlpha, FSliderEnum::Left);
+						FSlider(Vars::Aletherium::Weather::RainSpeed, FSliderEnum::Right);
+						break;
+					case Vars::Aletherium::Weather::PrecipitationEnum::Snow:
+						FSlider(Vars::Aletherium::Weather::SnowAlpha, FSliderEnum::Left);
+						FSlider(Vars::Aletherium::Weather::SnowDensity, FSliderEnum::Right);
+						break;
+					}
+				} EndSection();
+
+				if (Section("Fog", 8))
+				{
+					FToggle(Vars::Aletherium::Weather::Fog, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::Weather::Fog.Value);
+					{
+						FColorPicker(Vars::Aletherium::Weather::FogColor, FColorPickerEnum::SameLine);
+						FSlider(Vars::Aletherium::Weather::FogStart,   FSliderEnum::Left);
+						FSlider(Vars::Aletherium::Weather::FogEnd,     FSliderEnum::Right);
+						FSlider(Vars::Aletherium::Weather::FogDensity, FSliderEnum::Left);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			/* Column 2 — FakePOV */
+			TableNextColumn();
+			{
+				if (Section("Fake POV"))
+				{
+					FToggle(Vars::Aletherium::FakePOV::Enabled, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::FakePOV::Enabled.Value);
+					{
+						FDropdown(Vars::Aletherium::FakePOV::Mode,       FDropdownEnum::Right);
+						FSlider(Vars::Aletherium::FakePOV::SmoothSpeed,  FSliderEnum::Left);
+						if (Vars::Aletherium::FakePOV::Mode.Value == Vars::Aletherium::FakePOV::ModeEnum::Spinning)
+							FSlider(Vars::Aletherium::FakePOV::SpinSpeed, FSliderEnum::Right);
+						FToggle(Vars::Aletherium::FakePOV::SnapView,     FToggleEnum::Left);
+						FToggle(Vars::Aletherium::FakePOV::Arrow,        FToggleEnum::Right);
+						PushTransparent(!Vars::Aletherium::FakePOV::Arrow.Value);
+						{
+							FColorPicker(Vars::Aletherium::FakePOV::ArrowColor, FColorPickerEnum::SameLine);
+						}
+						PopTransparent();
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			EndTable();
+		}
+		break;
+	}
+
+	// ── HUD ───────────────────────────────────────────────────────────────
+	case 2:
+	{
+		if (BeginTable("AletheriumHUDTable", 2))
+		{
+			/* Column 1 — Watermark */
+			TableNextColumn();
+			{
+				if (Section("Watermark"))
+				{
+					FToggle(Vars::Aletherium::Watermark::Enabled, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::Watermark::Enabled.Value);
+					{
+						FDropdown(Vars::Aletherium::Watermark::Position);
+						FToggle(Vars::Aletherium::Watermark::ShowFPS,  FToggleEnum::Left);
+						FToggle(Vars::Aletherium::Watermark::ShowPing, FToggleEnum::Right);
+						FToggle(Vars::Aletherium::Watermark::ShowLoss, FToggleEnum::Left);
+						FToggle(Vars::Aletherium::Watermark::ShowTime, FToggleEnum::Right);
+						FToggle(Vars::Aletherium::Watermark::Background, FToggleEnum::Left);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			/* Column 2 — Indicators */
+			TableNextColumn();
+			{
+				if (Section("Velocity Indicator"))
+				{
+					FToggle(Vars::Aletherium::Indicators::VelocityEnabled, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::Indicators::VelocityEnabled.Value);
+					{
+						FSlider(Vars::Aletherium::Indicators::VelocityPosX, FSliderEnum::Left);
+						FSlider(Vars::Aletherium::Indicators::VelocityPosY, FSliderEnum::Right);
+						FToggle(Vars::Aletherium::Indicators::VelocityColorBySpeed, FToggleEnum::Left);
+						PushTransparent(!Vars::Aletherium::Indicators::VelocityColorBySpeed.Value);
+						{
+							FColorPicker(Vars::Aletherium::Indicators::VelocityColorLow,  FColorPickerEnum::Left);
+							FColorPicker(Vars::Aletherium::Indicators::VelocityColorMid,  FColorPickerEnum::Right);
+							FColorPicker(Vars::Aletherium::Indicators::VelocityColorHigh, FColorPickerEnum::Full);
+							FSlider(Vars::Aletherium::Indicators::VelocitySpeedLow,  FSliderEnum::Left);
+							FSlider(Vars::Aletherium::Indicators::VelocitySpeedHigh, FSliderEnum::Right);
+						}
+						PopTransparent();
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("Keybind Indicator", 8))
+				{
+					FToggle(Vars::Aletherium::Indicators::KeybindEnabled, FToggleEnum::Left);
+					PushTransparent(!Vars::Aletherium::Indicators::KeybindEnabled.Value);
+					{
+						FSlider(Vars::Aletherium::Indicators::KeybindPosX, FSliderEnum::Left);
+						FSlider(Vars::Aletherium::Indicators::KeybindPosY, FSliderEnum::Right);
+						FColorPicker(Vars::Aletherium::Indicators::KeybindTextColor,   FColorPickerEnum::Left);
+						FColorPicker(Vars::Aletherium::Indicators::KeybindDetectColor, FColorPickerEnum::Right);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			EndTable();
+		}
+		break;
+	}
+
+	// ── MISC ──────────────────────────────────────────────────────────────
+	case 3:
+	{
+		if (BeginTable("AletheriumMiscTable", 2))
+		{
+			TableNextColumn();
+			{
+				if (Section("Discord RPC"))
+				{
+					FToggle(Vars::Aletherium::Discord::Enabled, FToggleEnum::Left);
+				} EndSection();
+			}
+			TableNextColumn();
+			{
+				// placeholder for future Aletherium misc features
+			}
+			EndTable();
+		}
+		break;
+	}
+
+
+	// ── MOVEMENT ────────────────────────────────────────────────────────
+	case 4:
+	{
+		if (BeginTable("MiscMovementTable", 2))
+		{
+			/* Column 1 — jump tech */
+			TableNextColumn();
+			{
+				if (Section("EdgeBug"))
+				{
+					FToggle(Vars::Misc::Movement::EdgeBug, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::EdgeBug.Value);
+					{
+						FSlider(Vars::Misc::Movement::EdgeBugLockTicks, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::EdgeBugAngleLimit, FSliderEnum::Left);
+						FSlider(Vars::Misc::Movement::EdgeBugScanRadius, FSliderEnum::Right);
+						FToggle(Vars::Misc::Movement::EdgeBugAdvancedSearch, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::EdgeBugAutoStrafe, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::EdgeBugMouseLock, FToggleEnum::Left);
+						PushTransparent(!Vars::Misc::Movement::EdgeBugMouseLock.Value);
+						{
+							FDropdown(Vars::Misc::Movement::EdgeBugMouseLockType, FDropdownEnum::Right);
+							FSlider(Vars::Misc::Movement::EdgeBugLockAmount, FSliderEnum::Left);
+						}
+						PopTransparent();
+						FToggle(Vars::Misc::Movement::EdgeBugChatPrint, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::EdgeBugVisualize, FToggleEnum::Left);
+						FDropdown(Vars::Misc::Movement::EdgeBugSound, FDropdownEnum::Right);
+						PushTransparent(Vars::Misc::Movement::EdgeBugSound.Value != Vars::Misc::Movement::EdgeBugSoundEnum::Custom);
+						{
+							static std::string sEdgeBugSound;
+							sEdgeBugSound = Vars::Misc::Movement::EdgeBugSoundCustom.Value;
+							if (FInputText("Sound path", sEdgeBugSound, H::Draw.Scale(200)))
+								Vars::Misc::Movement::EdgeBugSoundCustom.Value = sEdgeBugSound;
+						}
+						PopTransparent();
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("LongJump / MiniJump", 8))
+				{
+					FToggle(Vars::Misc::Movement::LongJump, FToggleEnum::Left);
+					FToggle(Vars::Misc::Movement::MiniJump, FToggleEnum::Right);
+					PushTransparent(!Vars::Misc::Movement::MiniJump.Value);
+					{
+						FToggle(Vars::Misc::Movement::MiniJumpHoldDuck, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MiniJumpQueue, FToggleEnum::Right);
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("Strafe Optimizer", 8))
+				{
+					FToggle(Vars::Misc::Movement::StrafeOptimizer, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::StrafeOptimizer.Value);
+					{
+						FSlider(Vars::Misc::Movement::StrafeOptimizerGain, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::StrafeOptimizerMinSpeed, FSliderEnum::Left);
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("Jump Stats", 8))
+				{
+					FToggle(Vars::Misc::Movement::JumpStats, FToggleEnum::Left);
+				} EndSection();
+
+				if (Section("Checkpoints", 8))
+				{
+					FToggle(Vars::Misc::Movement::Checkpoints, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::Checkpoints.Value);
+					{
+						FKeybind(Vars::Misc::Movement::CheckpointSaveKey);
+						FKeybind(Vars::Misc::Movement::CheckpointTeleportKey);
+						FKeybind(Vars::Misc::Movement::CheckpointNoclipKey);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			/* Column 2 — surface tech */
+			TableNextColumn();
+			{
+				if (Section("TextureBug (Wall Surf)"))
+				{
+					FToggle(Vars::Misc::Movement::TextureBug, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::TextureBug.Value);
+					{
+						FToggle(Vars::Misc::Movement::HeadSurf, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::TextureBugAutoCrouch, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::TextureBugEdgeStop, FToggleEnum::Right);
+						FSlider(Vars::Misc::Movement::TextureBugHoldTicks, FSliderEnum::Left);
+						FSlider(Vars::Misc::Movement::TextureBugCatchEps, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::TextureBugReach, FSliderEnum::Left);
+						FSlider(Vars::Misc::Movement::TextureBugScanStep, FSliderEnum::Right);
+						FToggle(Vars::Misc::Movement::TextureBugChokeTick, FToggleEnum::Left);
+						PushTransparent(!Vars::Misc::Movement::TextureBugChokeTick.Value);
+						{
+							FSlider(Vars::Misc::Movement::TextureBugChokeTicks, FSliderEnum::Right);
+						}
+						PopTransparent();
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("PixelSurf", 8))
+				{
+					FToggle(Vars::Misc::Movement::PixelSurf, FToggleEnum::Left);
+					FToggle(Vars::Misc::Movement::AutoAlign, FToggleEnum::Right);
+					FToggle(Vars::Misc::Movement::WallClimb, FToggleEnum::Left);
+					FToggle(Vars::Misc::Movement::AirStuck, FToggleEnum::Right);
+					PushTransparent(!Vars::Misc::Movement::AirStuck.Value);
+					{
+						FSlider(Vars::Misc::Movement::AirStuckCatchEps, FSliderEnum::Left);
+						FSlider(Vars::Misc::Movement::AirStuckReach, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::AirStuckFlushTol, FSliderEnum::Left);
+						FSlider(Vars::Misc::Movement::AirStuckDriftGain, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::AirStuckSimBudget, FSliderEnum::Left);
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("Pixel Finder", 8))
+				{
+					FToggle(Vars::Misc::Movement::PixelFinder, FToggleEnum::Left);
+					FSlider(Vars::Misc::Movement::PixelFinderScanMargin, FSliderEnum::Right);
+					FToggle(Vars::Misc::Movement::PixelSurfLine, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::PixelSurfLine.Value);
+					{
+						FColorPicker(Vars::Misc::Movement::PixelSurfLineColor, FColorPickerEnum::SameLine);
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("PixelSurf Assist", 8))
+				{
+					FToggle(Vars::Misc::Movement::PixelSurfAssist, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::PixelSurfAssist.Value);
+					{
+						FSlider(Vars::Misc::Movement::PixelSurfAssistRadius, FSliderEnum::Right);
+						FSlider(Vars::Misc::Movement::PixelSurfAssistSnapDist, FSliderEnum::Left);
+						FToggle(Vars::Misc::Movement::PixelSurfAssistRender, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::PixelSurfAssistSteer, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::PixelSurfAssistJumpBox, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::PixelSurfAssistSetPoint, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::PixelSurfAssistDeletePoint, FToggleEnum::Right);
+					}
+					PopTransparent();
+				} EndSection();
+
+				if (Section("Movement Recorder", 8))
+				{
+					FToggle(Vars::Misc::Movement::MovementRecorder, FToggleEnum::Left);
+					PushTransparent(!Vars::Misc::Movement::MovementRecorder.Value);
+					{
+						FToggle(Vars::Misc::Movement::MovementRecorderHud, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderShowPath, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderShowRoutes, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderMoveToStart, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderDriftCorrect, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderVerbatim, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderLockView, FToggleEnum::Right);
+						FSlider(Vars::Misc::Movement::MovementRecorderShadowSeconds, FSliderEnum::Left);
+						FColorPicker(Vars::Misc::Movement::MovementRecorderRouteColor, FColorPickerEnum::SameLine);
+						FToggle(Vars::Misc::Movement::MovementRecorderRecord, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderPlay, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderStop, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderSave, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderLoad, FToggleEnum::Left);
+						FToggle(Vars::Misc::Movement::MovementRecorderClear, FToggleEnum::Right);
+						FToggle(Vars::Misc::Movement::MovementRecorderShadowSave, FToggleEnum::Left);
+					}
+					PopTransparent();
+				} EndSection();
+			}
+			EndTable();
+		}
+		break;
+	}
+
+	} // switch
+}
+
 void CMenu::MenuSearch(std::string sSearch)
 {
 	using namespace ImGui;
@@ -3969,6 +4436,35 @@ void CMenu::DrawBinds()
 						case BindEnum::MiscEnum::Aiming: { sInfo = "aiming"; break; }
 						}
 						break;
+					}
+					break;
+				case BindEnum::Health:
+					sType = tBind.m_iInfo == BindEnum::HealthEnum::BelowPercent ? "hp <" : "hp >";
+					sInfo = std::format("{}%", tBind.m_iInfoAux);
+					break;
+				case BindEnum::Movement:
+					sType = "move";
+					switch (tBind.m_iInfo)
+					{
+					case BindEnum::MovementEnum::Moving:  { sInfo = "moving";   break; }
+					case BindEnum::MovementEnum::InAir:   { sInfo = "in air";   break; }
+					case BindEnum::MovementEnum::Ducking: { sInfo = "ducking";  break; }
+					case BindEnum::MovementEnum::InWater: { sInfo = "in water"; break; }
+					}
+					break;
+				case BindEnum::Condition:
+					sType = "cond";
+					switch (tBind.m_iInfo)
+					{
+					case BindEnum::ConditionEnum::Burning:    { sInfo = "burning";    break; }
+					case BindEnum::ConditionEnum::Cloaked:    { sInfo = "cloaked";    break; }
+					case BindEnum::ConditionEnum::Disguised:  { sInfo = "disguised";  break; }
+					case BindEnum::ConditionEnum::Ubered:     { sInfo = "ubered";     break; }
+					case BindEnum::ConditionEnum::Overhealed: { sInfo = "overhealed"; break; }
+					case BindEnum::ConditionEnum::Bleeding:   { sInfo = "bleeding";   break; }
+					case BindEnum::ConditionEnum::Stunned:    { sInfo = "stunned";    break; }
+					case BindEnum::ConditionEnum::Taunting:   { sInfo = "taunting";   break; }
+					case BindEnum::ConditionEnum::HasAmmo:    { sInfo = "has ammo";   break; }
 					}
 					break;
 				}

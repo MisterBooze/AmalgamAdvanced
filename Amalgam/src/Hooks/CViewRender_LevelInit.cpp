@@ -8,6 +8,7 @@
 #include "../Features/CheatDetection/CheatDetection.h"
 #include "../Features/Resolver/Resolver.h"
 #include "../Features/Spectate/Spectate.h"
+#include "../Features/Visuals/FlipWorld/FlipWorld.h"
 
 MAKE_HOOK(CViewRender_LevelInit, U::Memory.GetVirtual(I::ViewRender, 1), void,
 	void* rcx)
@@ -16,6 +17,7 @@ MAKE_HOOK(CViewRender_LevelInit, U::Memory.GetVirtual(I::ViewRender, 1), void,
 
 	F::Materials.ReloadMaterials();
 	F::Visuals.OverrideWorldTextures();
+	F::FlipWorld.Initialize();
 
 	F::Backtrack.Reset();
 	F::Ticks.Reset();

@@ -920,6 +920,12 @@
     <ClCompile Include="src\Features\Backtrack\Backtrack.cpp" />
     <ClCompile Include="src\Features\Visuals\CameraWindow\CameraWindow.cpp" />
     <ClCompile Include="src\Features\CheatDetection\CheatDetection.cpp" />
+    <ClCompile Include="src\Features\CheaterDetection\CheaterDetection.cpp" />
+    <ClCompile Include="src\Features\DiscordRPC\DiscordRPC.cpp" />
+    <ClCompile Include="src\Features\Indicators\Indicators.cpp" />
+    <ClCompile Include="src\Features\Visuals\Weather\Weather.cpp" />
+    <ClCompile Include="src\Features\Visuals\FakePOV\FakePOV.cpp" />
+    <ClCompile Include="src\Features\Visuals\FlipWorld\FlipWorld.cpp" />
     <ClCompile Include="src\Features\Commands\Commands.cpp" />
     <ClCompile Include="src\Features\Binds\Binds.cpp" />
     <ClCompile Include="src\Features\Configs\Configs.cpp" />
@@ -1233,6 +1239,9 @@
     <ClInclude Include="src\Features\Misc\AutoQueue\AutoQueue.h" />
     <ClInclude Include="src\Features\Backtrack\Backtrack.h" />
     <ClInclude Include="src\Features\CheatDetection\CheatDetection.h" />
+    <ClInclude Include="src\Features\CheaterDetection\CheaterDetection.h" />
+    <ClInclude Include="src\Features\DiscordRPC\DiscordRPC.h" />
+    <ClInclude Include="src\Features\Indicators\Indicators.h" />
     <ClInclude Include="src\Features\CritHack\CritHack.h" />
     <ClInclude Include="src\Features\EnginePrediction\EnginePrediction.h" />
     <ClInclude Include="src\Features\ImGui\Fonts\CascadiaMono\CascadiaMono.h" />
@@ -1257,7 +1266,10 @@
     <ClInclude Include="src\Features\Visuals\Chams\Chams.h" />
     <ClInclude Include="src\Features\Visuals\ESP\ESP.h" />
     <ClInclude Include="src\Features\Visuals\FakeAngle\FakeAngle.h" />
+    <ClInclude Include="src\Features\Visuals\FakePOV\FakePOV.h" />
+    <ClInclude Include="src\Features\Visuals\FlipWorld\FlipWorld.h" />
     <ClInclude Include="src\Features\Visuals\Glow\Glow.h" />
+    <ClInclude Include="src\Features\Visuals\Weather\Weather.h" />
     <ClInclude Include="src\Features\Visuals\Groups\Groups.h" />
     <ClInclude Include="src\Features\Visuals\PlayerConditions\PlayerConditions.h" />
     <ClInclude Include="src\Features\Visuals\OffscreenArrows\OffscreenArrows.h" />

@@ -187,6 +187,8 @@ NAMESPACE_BEGIN(Vars)
 		CVar(PingDisplay, "Ping display", DragBox_t(), VISUAL | NOBIND);
 		CVar(ConditionsDisplay, "Conditions display", DragBox_t(), VISUAL | NOBIND);
 		CVar(SeedPredictionDisplay, "Seed prediction display", DragBox_t(), VISUAL | NOBIND);
+		CVar(RecorderDisplay, "Recorder display", DragBox_t(), VISUAL | NOBIND);
+		CVar(CheckpointsDisplay, "Checkpoints display", DragBox_t(), VISUAL | NOBIND);
 
 		CVar(Scale, "Scale", 1.f, NOBIND | SLIDER_MIN | SLIDER_PRECISION | SLIDER_NOAUTOUPDATE, 0.75f, 2.f, 0.25f);
 		CVar(CheapText, "Cheap text", false, NOBIND);
@@ -212,6 +214,7 @@ NAMESPACE_BEGIN(Vars)
 		CVar(Local, "Local color", Color_t(255, 255, 255), VISUAL);
 		CVar(FOVCircle, "FOV circle color", Color_t(255, 255, 255, 100), VISUAL);
 		CVar(SpellFootstep, "Spell footstep color", Color_t(255, 255, 255, 255), VISUAL);
+		CVar(EdgeBugCircle, "Edge bug circle color", Color_t(255, 255, 255, 255), VISUAL);
 
 		CVar(WorldModulation, VA_LIST("World modulation", "World modulation color"), Color_t(255, 255, 255, 255), VISUAL);
 		CVar(SkyModulation, VA_LIST("Sky modulation", "Sky modulation color"), Color_t(255, 255, 255, 255), VISUAL);
@@ -732,6 +735,122 @@ NAMESPACE_BEGIN(Vars)
 			CVar(AutoRocketJumpSkipAir, "Skip air", 1, NOSAVE | DEBUGVAR, 0, 3);
 			CVar(AutoRocketJumpTimingOffset, "Timing offset", 0, NOSAVE | DEBUGVAR, 0, 3);
 			CVar(AutoRocketJumpApplyAbove, "Apply offset above", 0, NOSAVE | DEBUGVAR, 0, 10);
+
+			// ── Aletherium movement features ──────────────────────────────
+			CVar(StrafeOptimizer, "Strafe optimizer", false);
+			CVar(StrafeOptimizerGain, "Optimizer gain", 50.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 100.f, 5.f);
+			CVar(StrafeOptimizerMinSpeed, "Optimizer min speed", 100.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 500.f, 10.f);
+
+			// EdgeBug
+			CVar(EdgeBug, "EdgeBug", false);
+			CVar(EdgeBugLockTicks, "EB lock ticks", 10, SLIDER_MIN, 1, 128);
+			CVar(EdgeBugAngleLimit, "EB angle limit", 90.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 180.f);
+			CVar(EdgeBugAdvancedSearch, "EB advanced search", true);
+			CVar(EdgeBugScanRadius, "EB scan radius", 8, SLIDER_MIN, 1, 48);
+			CVar(EdgeBugAutoStrafe, "EB auto strafe", true);
+			CVar(EdgeBugChatPrint, "EB chat print", false);
+			CVar(EdgeBugVisualize, "EB visualize path", false, VISUAL);
+			CVar(EdgeBugMouseLock, "EB mouse lock", false);
+			CVarEnum(EdgeBugMouseLockType, "EB lock type", 0, NONE, nullptr,
+				VA_LIST("Classic", "Static", "Dynamic", "Predicted"),
+				Classic, Static, Dynamic, Predicted);
+			CVar(EdgeBugLockAmount, "EB lock amount", 80.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 100.f, 5.f);
+			CVarEnum(EdgeBugSound, "EB sound", 0, NONE, nullptr,
+				VA_LIST("Off", "Panel open", "Menu focus", "Button click", "Button rollover", "Beep", "Blip", "Custom"),
+				Off, PanelOpen, MenuFocus, ButtonClick, ButtonRollover, Beep, Blip, Custom);
+			CVar(EdgeBugSoundCustom, "EB sound path", std::string(""));
+
+			// LongJump / MiniJump
+			CVar(LongJump, "Long jump", false);
+			CVar(MiniJump, "Mini jump", false);
+			CVar(MiniJumpHoldDuck, "Mini jump hold duck", true);
+			CVar(MiniJumpQueue, "Mini jump queue", true);
+
+			// AutoAlign
+			CVar(AutoAlign, "Auto align", false);
+
+			// PixelSurf
+			CVar(PixelSurf, "Pixel surf", false);
+
+			// TextureBug
+			CVar(TextureBug, "Texture bug", false);
+			CVar(TextureBugAutoCrouch, "TB auto crouch", true);
+			CVar(TextureBugEdgeStop, "TB edge stop", true);
+			CVar(TextureBugHoldTicks, "TB hold ticks", 4, SLIDER_MIN, 0, 16);
+			CVar(TextureBugCatchEps, "TB catch eps", 2.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.1f, 8.f, 0.1f);
+			CVar(TextureBugReach, "TB reach", 2.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 16.f, 0.5f);
+			CVar(TextureBugScanStep, "TB scan step", 1.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.5f, 4.f, 0.25f);
+			CVar(TextureBugChokeTick, "TB choke tick", false);
+			CVar(TextureBugChokeTicks, "TB choke ticks", 6, SLIDER_MIN, 1, 14);
+
+			// HeadSurf (runs under TextureBug toggle)
+			CVar(HeadSurf, "Head surf", false);
+
+			// WallClimb
+			CVar(WallClimb, "Wall climb", false);
+
+			// AirStuck
+			CVar(AirStuck, "Air stuck", false);
+			CVar(AirStuckCatchEps, "AS catch eps", 2.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.1f, 8.f, 0.1f);
+			CVar(AirStuckReach, "AS reach", 24.f, SLIDER_CLAMP | SLIDER_PRECISION, 4.f, 64.f, 2.f);
+			CVar(AirStuckFlushTol, "AS flush tol", 0.1f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 2.f, 0.05f);
+			CVar(AirStuckDriftGain, "AS drift gain", 18.f, SLIDER_CLAMP | SLIDER_PRECISION, 1.f, 80.f, 1.f);
+			CVar(AirStuckSimBudget, "AS sim budget", 64, SLIDER_MIN, 4, 128);
+
+			// PixelFinder
+			CVar(PixelFinder, "Pixel finder", false);
+			CVar(PixelFinderScanMargin, "PF scan margin", 4.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 32.f, 1.f);
+
+			// PixelSurf line recorder
+			CVar(PixelSurfLine, "Pixel surf line", false, VISUAL);
+			CVar(PixelSurfLineColor, "Surf line color", Color_t(255, 200, 50, 200), VISUAL);
+
+			// PixelSurfAssist
+			CVar(PixelSurfAssist, "Pixel surf assist", false);
+			CVar(PixelSurfAssistRadius, "PS assist radius", 300.f, SLIDER_CLAMP | SLIDER_PRECISION, 50.f, 1500.f, 25.f);
+			CVar(PixelSurfAssistSnapDist, "PS snap dist", 32.f, SLIDER_CLAMP | SLIDER_PRECISION, 4.f, 128.f, 4.f);
+			CVar(PixelSurfAssistRender, "PS assist render", true, VISUAL);
+			CVar(PixelSurfAssistSteer, "PS assist steer", true);
+			CVar(PixelSurfAssistJumpBox, "PS jump box", true, VISUAL);
+			CVar(PixelSurfAssistSetPoint, "PS set point", false, NOBIND);
+			CVar(PixelSurfAssistDeletePoint, "PS delete point", false, NOBIND);
+
+			// MovementRecorder
+			CVar(MovementRecorder, "Movement recorder", false);
+			CVar(MovementRecorderRecord, "MR record", false, NOBIND);
+			CVar(MovementRecorderPlay, "MR play", false, NOBIND);
+			CVar(MovementRecorderStop, "MR stop", false, NOBIND);
+			CVar(MovementRecorderSave, "MR save", false, NOBIND);
+			CVar(MovementRecorderLoad, "MR load", false, NOBIND);
+			CVar(MovementRecorderClear, "MR clear", false, NOBIND);
+			CVar(MovementRecorderHud, "MR HUD", true, VISUAL);
+			CVar(MovementRecorderShowPath, "MR show path", true, VISUAL);
+			CVar(MovementRecorderShowRoutes, "MR show routes", true, VISUAL);
+			CVar(MovementRecorderMoveToStart, "MR move to start", true);
+			CVar(MovementRecorderMoveToStartDist, "MR start dist", 4.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.5f, 32.f, 0.5f);
+			CVar(MovementRecorderStartSpeed, "MR start speed", 16.f, SLIDER_CLAMP | SLIDER_PRECISION, 1.f, 80.f, 1.f);
+			CVar(MovementRecorderStartTolerance, "MR start tol", 8.f, SLIDER_CLAMP | SLIDER_PRECISION, 1.f, 64.f, 1.f);
+			CVar(MovementRecorderDriftCorrect, "MR drift correct", true);
+			CVar(MovementRecorderDriftStrength, "MR drift strength", 0.5f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 1.f, 0.05f);
+			CVar(MovementRecorderVerbatim, "MR verbatim", false);
+			CVar(MovementRecorderLockView, "MR lock view", true);
+			CVar(MovementRecorderRouteColor, "MR route color", Color_t(255, 200, 50, 180), VISUAL);
+			CVar(MovementRecorderRoutePoints, "MR route points", 8, SLIDER_MIN, 3, 64);
+			CVar(MovementRecorderRouteRadius, "MR route radius", 6.f, SLIDER_CLAMP | SLIDER_PRECISION, 1.f, 24.f, 1.f);
+			CVar(MovementRecorderRouteSolid, "MR route solid", false, VISUAL);
+			CVar(MovementRecorderShadowPlay, "MR shadow play", false);
+			CVar(MovementRecorderShadowSave, "MR shadow save", false, NOBIND);
+			CVar(MovementRecorderShadowSeconds, "MR shadow secs", 15.f, SLIDER_CLAMP | SLIDER_PRECISION, 5.f, 60.f, 5.f);
+
+			// Checkpoints (KZ practice)
+			CVar(Checkpoints, "Checkpoints", false);
+			CVar(CheckpointSaveKey, "CP save key", 0, NOBIND);
+			CVar(CheckpointTeleportKey, "CP teleport key", 0, NOBIND);
+			CVar(CheckpointNoclipKey, "CP noclip key", 0, NOBIND);
+
+			// JumpStats
+			CVar(JumpStats, "Jump stats", false, VISUAL);
+			// ──────────────────────────────────────────────────────────────
 		NAMESPACE_END(Movement)
 
 		NAMESPACE_BEGIN(Automation)
@@ -900,4 +1019,225 @@ NAMESPACE_BEGIN(Vars)
 
 		CVar(DrawHitboxes, "Show hitboxes", false, NOSAVE);
 	NAMESPACE_END(Debug)
+
+	// ── Aletherium ─────────────────────────────────────────────────────────
+	// Features ported from the Aletherium fork. The logic files are not yet
+	// included; these vars declare the config surface so the menu page compiles
+	// and configs save/load correctly. Wire feature implementations as needed.
+
+	NAMESPACE_BEGIN(Aletherium, Aletherium)
+
+		// Backstab (Aimbot > Knife)
+		NAMESPACE_BEGIN(Backstab, Aletherium)
+			CVar(AutoBackstab, "Auto backstab", false);
+			CVarEnum(AimType, "Backstab aim type", 0, NONE, nullptr,
+				VA_LIST("Silent", "Legit"),
+				Silent, Legit);
+			CVar(FOV, "Backstab FOV", 180.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 180.f);
+			CVar(AutoShoot, "Backstab auto shoot", false);
+			CVarValues(Ignore, "Backstab ignore", 0b100000001000, DROPDOWN_MULTI, nullptr,
+				VA_LIST("Friends", "Party", "Unprioritized", "Invulnerable", "Invisible",
+				        "Unsimulated", "Dead ringer", "Vaccinator", "Disguised", "Taunting", "Team", "Razorback"));
+			// Reliability
+			CVar(AccountPing, "Backstab account ping", false);
+			CVar(DoubleTest, "Backstab double test", false);
+			CVar(RemoveInterp, "Backstab remove interp", false);
+			CVar(StrictRange, "Backstab strict range", false);
+			CVar(PredictMovement, "Backstab predict movement", false);
+			CVar(Aggressive, "Backstab aggressive", false);
+			CVar(MultiPoint, "Backstab multi point", false);
+			CVar(ExtrapolateYaw, "Backstab extrapolate yaw", false);
+			CVar(UnstableConnection, "Backstab unstable connection", false);
+			CVar(UnstableMaxAngle, "Backstab unstable max angle", 25.f, SLIDER_CLAMP | SLIDER_PRECISION, 0.f, 60.f);
+		NAMESPACE_END(Backstab)
+
+		// Watermark HUD
+		NAMESPACE_BEGIN(Watermark, Aletherium)
+			CVar(Enabled, "Watermark", false, VISUAL);
+			CVar(ShowFPS,  "Show FPS",  true,  VISUAL);
+			CVar(ShowPing, "Show ping", false, VISUAL);
+			CVar(ShowLoss, "Show loss", false, VISUAL);
+			CVar(ShowTime, "Show time", false, VISUAL);
+			CVar(Background, "Watermark background", true, VISUAL);
+			CVarEnum(Position, "Watermark position", 2, VISUAL, nullptr,
+				VA_LIST("Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right"),
+				TopLeft, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight);
+		NAMESPACE_END(Watermark)
+
+		// Weather / Fog
+		NAMESPACE_BEGIN(Weather, Aletherium)
+			CVar(Fog, "Fog override", false, VISUAL);
+			CVar(FogStart, "Fog start", 0.f,   VISUAL | SLIDER_PRECISION, 0.f, 8192.f, 32.f, "%.0f");
+			CVar(FogEnd,   "Fog end",   2048.f, VISUAL | SLIDER_PRECISION, 0.f, 8192.f, 32.f, "%.0f");
+			CVar(FogDensity, "Fog density", 0.5f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.01f, "%.2f");
+			CVar(FogLinkSkybox, "Link skybox fog", true, VISUAL);
+			CVar(FogSkyStart,   "Sky fog start",   0.f,    VISUAL | SLIDER_PRECISION, 0.f, 8192.f, 32.f, "%.0f");
+			CVar(FogSkyEnd,     "Sky fog end",     2048.f, VISUAL | SLIDER_PRECISION, 0.f, 8192.f, 32.f, "%.0f");
+			CVar(FogSkyDensity, "Sky fog density", 0.5f,   VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.01f, "%.2f");
+			CVar(FogColor, "Fog color", Color_t(200, 200, 200, 255), VISUAL);
+			CVarEnum(Precipitation, "Precipitation", 0, VISUAL, nullptr,
+				VA_LIST("Off", "Rain", "Snow"),
+				Off, Rain, Snow);
+			// Rain convar detail
+			CVar(RainAlpha,   "Rain alpha",    0.5f,  VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.05f, "%.2f");
+			CVar(RainSpeed,   "Rain speed",    1500.f,VISUAL | SLIDER_PRECISION, 100.f, 4000.f, 50.f, "%.0f");
+			CVar(RainWidth,   "Rain width",    0.5f,  VISUAL | SLIDER_PRECISION, 0.1f, 4.f, 0.1f, "%.1f");
+			CVar(RainLength,  "Rain length",   0.1f,  VISUAL | SLIDER_PRECISION, 0.01f, 1.f, 0.01f, "%.2f");
+			CVar(RainRadius,  "Rain radius",   1500.f,VISUAL | SLIDER_PRECISION, 100.f, 4000.f, 50.f, "%.0f");
+			CVar(RainSideVel, "Rain side vel", 130.f, VISUAL | SLIDER_PRECISION, 0.f, 500.f, 10.f, "%.0f");
+			// Snow convar detail
+			CVar(SnowAlpha,   "Snow alpha",   0.8f,  VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.05f, "%.2f");
+			CVar(SnowSpeed,   "Snow speed",   150.f, VISUAL | SLIDER_PRECISION, 10.f, 1000.f, 10.f, "%.0f");
+			CVar(SnowWidth,   "Snow width",   2.f,   VISUAL | SLIDER_PRECISION, 0.5f, 8.f, 0.25f, "%.2f");
+			CVar(SnowLength,  "Snow length",  0.05f, VISUAL | SLIDER_PRECISION, 0.01f, 0.5f, 0.01f, "%.2f");
+			CVar(SnowRadius,  "Snow radius",  1500.f,VISUAL | SLIDER_PRECISION, 100.f, 4000.f, 50.f, "%.0f");
+			CVar(SnowSideVel, "Snow side vel",40.f,  VISUAL | SLIDER_PRECISION, 0.f, 300.f, 5.f, "%.0f");
+			CVar(SnowDensity, "Snow density", 1.f,   VISUAL | SLIDER_PRECISION, 0.1f, 5.f, 0.1f, "%.1f");
+			CVar(SnowSprite,  "Snow sprite",  std::string("particle/snow"), VISUAL);
+			CVar(FlipWorld, "Flip world", false, VISUAL);
+		NAMESPACE_END(Weather)
+
+		// Indicators (velocity + keybind HUD)
+		NAMESPACE_BEGIN(Indicators, Aletherium)
+			// ── Velocity number ──────────────────────────────────────────
+			CVar(VelocityEnabled, "Velocity indicator", false, VISUAL);
+			CVar(VelocityPosX, "Velocity X", 0.5f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVar(VelocityPosY, "Velocity Y", 0.85f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVar(VelocityScale, "Velocity scale", 1.f, VISUAL | SLIDER_PRECISION, 0.5f, 3.f, 0.05f, "%.2f");
+			CVar(VelocityColorBySpeed, "Color by speed", false, VISUAL);
+			CVar(VelocityColorLow,  "Low speed color",  Color_t(255, 255, 255, 255), VISUAL);
+			CVar(VelocityColorMid,  "Mid speed color",  Color_t(255, 200, 100, 255), VISUAL);
+			CVar(VelocityColorHigh, "High speed color", Color_t(255, 100, 100, 255), VISUAL);
+			CVar(VelocitySpeedLow,  "Low speed",  300.f, VISUAL | SLIDER_PRECISION, 0.f,    800.f, 10.f, "%.0f");
+			CVar(VelocitySpeedHigh, "High speed", 600.f, VISUAL | SLIDER_PRECISION, 100.f, 1500.f, 10.f, "%.0f");
+			CVar(VelocityFadeIn, "Fade in", true, VISUAL);
+			CVar(VelocityFadeThreshold, "Fade threshold", 0.f, VISUAL | SLIDER_PRECISION, 0.f, 1000.f, 5.f, "%.0f");
+			CVar(VelocityOutline, "Outline", false, VISUAL);
+			CVar(VelocityOutlineThick, "Outline thick", 1.f, VISUAL | SLIDER_PRECISION, 1.f, 4.f, 0.5f, "%.1f");
+			CVar(VelocityOutlineColor, "Outline color", Color_t(0, 0, 0, 200), VISUAL);
+			CVar(VelocityShadow, "Shadow", false, VISUAL);
+			CVar(VelocityShadowBlur, "Shadow blur", false, VISUAL);
+			CVar(VelocityShadowColor, "Shadow color", Color_t(0, 0, 0, 180), VISUAL);
+			CVar(VelocityShadowOffX, "Shadow X", 1.f, VISUAL | SLIDER_PRECISION, -5.f, 5.f, 0.5f, "%.1f");
+			CVar(VelocityShadowOffY, "Shadow Y", 1.f, VISUAL | SLIDER_PRECISION, -5.f, 5.f, 0.5f, "%.1f");
+			// ── Takeoff (pre-jump) number ────────────────────────────────
+			CVar(VelocityTakeoff, "Takeoff speed", false, VISUAL);
+			CVarEnum(VelocityTakeoffPos, "Takeoff position", 0, VISUAL, nullptr,
+				VA_LIST("Beside", "Above", "Below"),
+				Beside, Above, Below);
+			CVarEnum(VelocityTakeoffAnim, "Takeoff animation", 0, VISUAL, nullptr,
+				VA_LIST("Slide", "Expand", "Static"),
+				Slide, Expand, Static);
+			CVar(VelocityTakeoffHold, "Takeoff hold time", 1.2f, VISUAL | SLIDER_PRECISION, 0.1f, 5.f, 0.1f, "%.1f");
+			CVar(VelocityTakeoffFade, "Takeoff fade time", 0.4f, VISUAL | SLIDER_PRECISION, 0.f, 2.f, 0.05f, "%.2f");
+			// ── Velocity graph ───────────────────────────────────────────
+			CVar(VelocityGraph, "Velocity graph", false, VISUAL);
+			CVar(VelocityGraphPosX, "Graph X", 0.5f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVar(VelocityGraphPosY, "Graph Y", 0.9f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVar(VelocityGraphW, "Graph width", 200.f, VISUAL | SLIDER_PRECISION, 50.f, 600.f, 5.f, "%.0f");
+			CVar(VelocityGraphH, "Graph height", 60.f, VISUAL | SLIDER_PRECISION, 10.f, 300.f, 2.f, "%.0f");
+			CVar(VelocityGraphMaxSpeed, "Graph max speed", 500.f, VISUAL | SLIDER_PRECISION, 100.f, 3000.f, 50.f, "%.0f");
+			CVar(VelocityGraphLineH, "Graph line height", 1.f, VISUAL | SLIDER_PRECISION, 1.f, 5.f, 0.5f, "%.1f");
+			CVar(VelocityGraphColor, "Graph color", Color_t(255, 255, 255, 180), VISUAL);
+			CVar(VelocityGraphFade, "Graph fade", 0, VISUAL);
+			// ── Keybind indicator ────────────────────────────────────────
+			CVar(KeybindEnabled, "Keybind indicator", false, VISUAL);
+			CVar(KeybindMask, "Keybind indicators", 4095, VISUAL);
+			CVar(KeybindPosX, "Keybind X", 0.5f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVar(KeybindPosY, "Keybind Y", 0.9f, VISUAL | SLIDER_PRECISION, 0.f, 1.f, 0.005f, "%.3f");
+			CVarEnum(KeybindEasing, "Keybind easing", 1, VISUAL, nullptr,
+				VA_LIST("Linear", "Fast", "Smooth", "Bounce", "Overshoot"),
+				Linear, Fast, Smooth, Bounce, Overshoot);
+			CVar(KeybindFadeDuration, "Fade duration", 0.25f, VISUAL | SLIDER_PRECISION, 0.05f, 2.f, 0.05f, "%.2f");
+			CVarEnum(KeybindLayout, "Layout", 0, VISUAL, nullptr,
+				VA_LIST("Horizontal", "Vertical"),
+				Horizontal, Vertical);
+			CVarEnum(KeybindVerticalDir, "Vertical dir", 0, VISUAL, nullptr,
+				VA_LIST("Down", "Up"),
+				Down, Up);
+			CVarEnum(KeybindEntryAnim, "Entry animation", 1, VISUAL, nullptr,
+				VA_LIST("Static", "Slide right", "Slide left", "Slide center"),
+				Static, SlideRight, SlideLeft, SlideCenter);
+			CVar(KeybindEntryOffset, "Entry offset", 60.f, VISUAL | SLIDER_PRECISION, 0.f, 300.f, 5.f, "%.0f");
+			CVar(KeybindTextColor, "Text color", Color_t(255, 255, 255, 255), VISUAL);
+			CVar(KeybindShadow, "Shadow", false, VISUAL);
+			CVar(KeybindShadowBlur, "Shadow blur", false, VISUAL);
+			CVar(KeybindShadowColor, "Shadow color", Color_t(0, 0, 0, 180), VISUAL);
+			CVar(KeybindShadowOffX, "Shadow X", 1.f, VISUAL | SLIDER_PRECISION, -5.f, 5.f, 0.5f, "%.1f");
+			CVar(KeybindShadowOffY, "Shadow Y", 1.f, VISUAL | SLIDER_PRECISION, -5.f, 5.f, 0.5f, "%.1f");
+			// detect effects
+			CVar(KeybindDetectText, "Detect color text", true, VISUAL);
+			CVar(KeybindDetectTextColor, "Detect text color", Color_t(255, 200, 50, 255), VISUAL);
+			CVar(KeybindDetectColor, "Detect color", Color_t(255, 200, 50, 255), VISUAL);
+			CVar(KeybindDetectGlow, "Detect glow", false, VISUAL);
+			CVar(KeybindDetectGlowColor, "Glow color", Color_t(255, 200, 50, 200), VISUAL);
+			CVar(KeybindDetectGlowBlur, "Glow blur", 4.f, VISUAL | SLIDER_PRECISION, 0.f, 20.f, 0.5f, "%.1f");
+			CVar(KeybindDetectGlowStencil, "Glow stencil", 1, VISUAL);
+			CVar(KeybindDetectEffectMask, "Keybind detection effects", 4095, VISUAL);
+			CVar(KeybindDetectParticles, "Particles", false, VISUAL);
+			CVar(KeybindDetectParticleColor, "Particle color", Color_t(255, 200, 50, 220), VISUAL);
+			CVar(KeybindDetectParticleCount, "Particle count", 12, SLIDER_MIN, 1, 60);
+			CVar(KeybindDetectParticleSpeed, "Particle speed", 180.f, VISUAL | SLIDER_PRECISION, 10.f, 800.f, 10.f, "%.0f");
+			CVar(KeybindDetectParticleLifetime, "Particle lifetime", 0.8f, VISUAL | SLIDER_PRECISION, 0.1f, 3.f, 0.05f, "%.2f");
+			CVar(KeybindDetectParticleScale, "Particle scale", 3.f, VISUAL | SLIDER_PRECISION, 1.f, 20.f, 0.5f, "%.1f");
+			CVar(KeybindDetectParticleSpread, "Particle spread", 6.f, VISUAL | SLIDER_PRECISION, 0.f, 40.f, 1.f, "%.0f");
+			CVar(KeybindDetectParticleGravity, "Particle gravity", 80.f, VISUAL | SLIDER_PRECISION, -500.f, 500.f, 10.f, "%.0f");
+			CVar(KeybindDetectParticleAntiAlias, "Particle AA", true, VISUAL);
+			CVarEnum(KeybindDetectParticleShape, "Particle shape", 0, VISUAL, nullptr,
+				VA_LIST("Random", "Circle", "Square", "Triangle", "Diamond", "Star"),
+				Random, Circle, Square, Triangle, Diamond, Star);
+			CVar(KeybindDetectRipple, "Ripple", false, VISUAL);
+			CVar(KeybindDetectRippleColor, "Ripple color", Color_t(255, 200, 50, 200), VISUAL);
+			CVar(KeybindDetectRippleCount, "Ripple count", 3, SLIDER_MIN, 1, 8);
+			CVar(KeybindDetectRippleDuration, "Ripple duration", 0.7f, VISUAL | SLIDER_PRECISION, 0.1f, 3.f, 0.05f, "%.2f");
+			CVar(KeybindDetectRippleRadius, "Ripple radius", 22.f, VISUAL | SLIDER_PRECISION, 5.f, 80.f, 1.f, "%.0f");
+			CVar(KeybindDetectRippleThickness, "Ripple thickness", 1.5f, VISUAL | SLIDER_PRECISION, 0.5f, 6.f, 0.25f, "%.2f");
+			// Labels (customisable display names)
+			CVar(KeybindLabelEdgeBug,       "EdgeBug label",       std::string("EdgeBug"));
+			CVar(KeybindLabelLongJump,      "LongJump label",      std::string("LongJump"));
+			CVar(KeybindLabelMiniJump,      "MiniJump label",      std::string("MiniJump"));
+			CVar(KeybindLabelAutoAlign,     "AutoAlign label",     std::string("AutoAlign"));
+			CVar(KeybindLabelPixelSurf,     "PixelSurf label",     std::string("PixelSurf"));
+			CVar(KeybindLabelTextureBug,    "TextureBug label",    std::string("TextureBug"));
+			CVar(KeybindLabelWallClimb,     "WallClimb label",     std::string("WallClimb"));
+			CVar(KeybindLabelJumpBug,       "JumpBug label",       std::string("JumpBug"));
+			CVar(KeybindLabelPixelFinder,   "PixelFinder label",   std::string("PixelFinder"));
+			CVar(KeybindLabelPixelSurfAssist,"PixelSurfAssist label", std::string("PSAssist"));
+			CVar(KeybindLabelAutoStrafe,    "AutoStrafe label",    std::string("AutoStrafe"));
+			CVar(KeybindLabelAirStuck,      "AirStuck label",      std::string("AirStuck"));
+		NAMESPACE_END(Indicators)
+
+		// Discord RPC
+		NAMESPACE_BEGIN(Discord, Aletherium)
+			CVar(Enabled, "Discord RPC", false, NOBIND);
+		NAMESPACE_END(Discord)
+
+		// FakePOV (demo cam angle offset)
+		NAMESPACE_BEGIN(FakePOV, Aletherium)
+			CVar(Enabled, "Fake POV", false, VISUAL);
+			CVarEnum(Mode, "Fake POV mode", 0, VISUAL, nullptr,
+				VA_LIST("Right", "Left", "Up", "Bottom", "Backwards", "Spinning"),
+				Right, Left, Up, Bottom, Backwards, Spinning);
+			CVar(SmoothSpeed, "Smooth speed", 5.f, VISUAL | SLIDER_PRECISION, 0.1f, 30.f, 0.5f, "%.1f");
+			CVar(SpinSpeed, "Spin speed", 90.f, VISUAL | SLIDER_PRECISION, 10.f, 720.f, 5.f, "%.0f");
+			CVar(SnapView, "Snap view on disable", true, VISUAL);
+			CVar(Arrow, "Show arrow", true, VISUAL);
+			CVar(ArrowColor, "Arrow color", Color_t(255, 200, 50, 220), VISUAL);
+			CVar(ArrowSize, "Arrow size", 12.f, VISUAL | SLIDER_PRECISION, 4.f, 40.f, 1.f, "%.0f");
+			CVar(ArrowDist, "Arrow distance", 28.f, VISUAL | SLIDER_PRECISION, 0.f, 120.f, 2.f, "%.0f");
+		NAMESPACE_END(FakePOV)
+
+		// Cheater Detection (extended)
+		NAMESPACE_BEGIN(CheaterDetection, Aletherium)
+			CVar(PacketChoking, "Detect packet choking", true, NOBIND);
+			CVar(AimFlicking, "Detect aim flicking", true, NOBIND);
+			CVar(DuckSpeed, "Detect duck speed", true, NOBIND);
+			CVar(MinimumChoking, "Minimum choke count", 20, SLIDER_MIN, 4, 22);
+			CVar(MinimumFlick, "Minimum flick angle", 20.f, SLIDER_PRECISION, 10.f, 60.f);
+			CVar(MaximumNoise, "Maximum flick noise", 1.f, SLIDER_PRECISION, 0.f, 10.f);
+		NAMESPACE_END(CheaterDetection)
+
+	NAMESPACE_END(Aletherium)
+	// ───────────────────────────────────────────────────────────────────────
+
 NAMESPACE_END(Vars)

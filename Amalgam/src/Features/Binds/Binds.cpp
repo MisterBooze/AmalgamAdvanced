@@ -43,12 +43,253 @@ static inline void LoopVars(int iBind, std::vector<BaseVar*>& vVars = G::Vars)
 	}
 }
 
-static inline void GetBinds(int iParent, CTFPlayer* pLocal, CTFWeaponBase* pWeapon, std::vector<Bind_t>& vBinds, bool bManage = true)
+// ============================================================
+//  EvaluateEventActive
+//
+//  Resolves a single event (type + info + infoAux) against
+//  the current game state.  Used for both the primary event
+//  and the AND event — same evaluation, no code duplication.
+//
+//  Returns the raw bool BEFORE applying a Not flag.
+//  The caller is responsible for negation.
+// ============================================================
+static bool EvaluateEventActive(int iType, int iInfo, int iInfoAux,
+                                 CTFPlayer* pLocal, CTFWeaponBase* pWeapon,
+                                 KeyStorage* pKeyStorage, int iKey,
+                                 bool& bActiveInOut /* only modified for Key type (toggle) */)
+{
+	switch (iType)
+	{
+	// ── KEY ──────────────────────────────────────────────────────────
+	case BindEnum::Key:
+	{
+		bool bKey = false;
+		switch (iInfo)
+		{
+		case BindEnum::KeyEnum::Hold:
+			bKey = U::KeyHandler.Down(iKey, false, pKeyStorage);
+			break;
+		case BindEnum::KeyEnum::Toggle:
+			bKey = U::KeyHandler.Pressed(iKey, false, pKeyStorage);
+			break;
+		case BindEnum::KeyEnum::DoubleClick:
+			bKey = U::KeyHandler.Double(iKey, false, pKeyStorage);
+			break;
+		}
+		bKey &= !s_bUI || s_bMenu && (!F::Menu.m_bWindowHovered || iKey != VK_LBUTTON && iKey != VK_RBUTTON);
+
+		// Toggle / DoubleClick flip bActiveInOut and return the result
+		switch (iInfo)
+		{
+		case BindEnum::KeyEnum::Hold:
+			return bKey;
+		case BindEnum::KeyEnum::Toggle:
+		case BindEnum::KeyEnum::DoubleClick:
+			if (bKey)
+				bActiveInOut = !bActiveInOut;
+			return bActiveInOut;
+		}
+		return false;
+	}
+
+	// ── CLASS ────────────────────────────────────────────────────────
+	case BindEnum::Class:
+	{
+		const int iClass = pLocal ? pLocal->m_iClass() : TF_CLASS_UNDEFINED;
+		switch (iInfo)
+		{
+		case BindEnum::ClassEnum::Scout:    return iClass == TF_CLASS_SCOUT;
+		case BindEnum::ClassEnum::Soldier:  return iClass == TF_CLASS_SOLDIER;
+		case BindEnum::ClassEnum::Pyro:     return iClass == TF_CLASS_PYRO;
+		case BindEnum::ClassEnum::Demoman:  return iClass == TF_CLASS_DEMOMAN;
+		case BindEnum::ClassEnum::Heavy:    return iClass == TF_CLASS_HEAVY;
+		case BindEnum::ClassEnum::Engineer: return iClass == TF_CLASS_ENGINEER;
+		case BindEnum::ClassEnum::Medic:    return iClass == TF_CLASS_MEDIC;
+		case BindEnum::ClassEnum::Sniper:   return iClass == TF_CLASS_SNIPER;
+		case BindEnum::ClassEnum::Spy:      return iClass == TF_CLASS_SPY;
+		}
+		return false;
+	}
+
+	// ── WEAPON TYPE ──────────────────────────────────────────────────
+	case BindEnum::WeaponType:
+		return iInfo == BindEnum::WeaponTypeEnum::Throwable
+			? G::Throwing
+			: iInfo + 1 == int(SDK::GetWeaponType(pWeapon));
+
+	// ── ITEM SLOT ────────────────────────────────────────────────────
+	case BindEnum::ItemSlot:
+		return iInfo == (pWeapon ? pWeapon->GetSlot() : -1);
+
+	// ── MISC ─────────────────────────────────────────────────────────
+	case BindEnum::Misc:
+	{
+		switch (iInfo)
+		{
+		case BindEnum::MiscEnum::Spectated:
+		case BindEnum::MiscEnum::SpectatedFirst:
+		case BindEnum::MiscEnum::SpectatedThird:
+		{
+			bool bFirst = false, bThird = false;
+			if (auto pResource = H::Entities.GetResource())
+			{
+				int iLocal = I::EngineClient->GetLocalPlayer();
+				for (int n = 1; n <= I::EngineClient->GetMaxClients(); n++)
+				{
+					auto pPlayer = I::ClientEntityList->GetClientEntity(n)->As<CTFPlayer>();
+
+					if (iLocal == n || pResource->IsFakePlayer(n)
+						|| !pPlayer || !pPlayer->IsPlayer() || pPlayer->IsAlive() || pPlayer->IsDormant()
+						|| pResource->m_iTeam(iLocal) != pResource->m_iTeam(n))
+						continue;
+
+					int iObserverTarget = pPlayer->m_hObserverTarget().GetEntryIndex();
+					int iObserverMode   = pPlayer->m_iObserverMode();
+					if (iObserverTarget != iLocal)
+						continue;
+
+					switch (iObserverMode)
+					{
+					case OBS_MODE_FIRSTPERSON: bFirst = true; break;
+					case OBS_MODE_THIRDPERSON: bThird = true; break;
+					}
+				}
+			}
+			switch (iInfo)
+			{
+			case BindEnum::MiscEnum::Spectated:      return bFirst || bThird;
+			case BindEnum::MiscEnum::SpectatedFirst: return bFirst;
+			case BindEnum::MiscEnum::SpectatedThird: return bThird;
+			}
+			return false;
+		}
+		case BindEnum::MiscEnum::Zoomed:
+			return pLocal ? pLocal->InCond(TF_COND_ZOOMED) : false;
+		case BindEnum::MiscEnum::Aiming:
+			return pLocal ? pLocal->InCond(TF_COND_AIMING) : false;
+		}
+		return false;
+	}
+
+	// ── HEALTH PERCENT ───────────────────────────────────────────────
+	//  iInfo    : HealthEnum (BelowPercent / AbovePercent)
+	//  iInfoAux : threshold 0-100
+	case BindEnum::Health:
+	{
+		if (!pLocal)
+			return false;
+
+		const int iHP    = pLocal->m_iHealth();
+		const int iMaxHP = pLocal->GetMaxHealth();
+		if (iMaxHP <= 0)
+			return false;
+
+		// Clamp threshold to valid range
+		const float flThresh = static_cast<float>(std::clamp(iInfoAux, 0, 100));
+		const float flPct    = (static_cast<float>(iHP) / static_cast<float>(iMaxHP)) * 100.f;
+
+		switch (iInfo)
+		{
+		case BindEnum::HealthEnum::BelowPercent: return flPct < flThresh;
+		case BindEnum::HealthEnum::AbovePercent: return flPct > flThresh;
+		}
+		return false;
+	}
+
+	// ── MOVEMENT / PHYSICS STATE ─────────────────────────────────────
+	case BindEnum::Movement:
+	{
+		if (!pLocal)
+			return false;
+
+		const int iFlags = pLocal->m_fFlags();
+		switch (iInfo)
+		{
+		case BindEnum::MovementEnum::Moving:
+		{
+			// Consider moving if horizontal speed > 5 ups (filters tiny network jitter)
+			const Vec3& vel = pLocal->m_vecVelocity();
+			const float flSpeed2D = std::sqrtf(vel.x * vel.x + vel.y * vel.y);
+			return flSpeed2D > 5.f;
+		}
+		case BindEnum::MovementEnum::InAir:
+			// Not on ground AND not on a ladder
+			return !(iFlags & FL_ONGROUND);
+		case BindEnum::MovementEnum::Ducking:
+			return (iFlags & FL_DUCKING) != 0;
+		case BindEnum::MovementEnum::InWater:
+			// nWaterLevel: 0=not, 1=feet, 2=waist, 3=eyes
+			return pLocal->m_nWaterLevel() >= 1;
+		}
+		return false;
+	}
+
+	// ── PLAYER CONDITIONS (TFCond-based + ammo) ──────────────────────
+	case BindEnum::Condition:
+	{
+		switch (iInfo)
+		{
+		case BindEnum::ConditionEnum::Burning:
+			return pLocal ? pLocal->InCond(TF_COND_BURNING) : false;
+
+		case BindEnum::ConditionEnum::Cloaked:
+			// True when spy is fully or partially cloaked
+			return pLocal
+				? pLocal->InCond(TF_COND_STEALTHED)
+				  || pLocal->InCond(TF_COND_STEALTHED_BLINK)
+				  || pLocal->InCond(TF_COND_STEALTHED_USER_BUFF)
+				  || pLocal->InCond(TF_COND_STEALTHED_USER_BUFF_FADING)
+				: false;
+
+		case BindEnum::ConditionEnum::Disguised:
+			return pLocal
+				? pLocal->InCond(TF_COND_DISGUISED)
+				  || pLocal->InCond(TF_COND_DISGUISING)
+				: false;
+
+		case BindEnum::ConditionEnum::Ubered:
+			// Any medigun uber variant
+			return pLocal ? pLocal->IsUbered() : false;
+
+		case BindEnum::ConditionEnum::Overhealed:
+			return pLocal ? pLocal->InCond(TF_COND_HEALTH_OVERHEALED) : false;
+
+		case BindEnum::ConditionEnum::Bleeding:
+			return pLocal ? pLocal->InCond(TF_COND_BLEEDING) : false;
+
+		case BindEnum::ConditionEnum::Stunned:
+			return pLocal ? pLocal->InCond(TF_COND_STUNNED) : false;
+
+		case BindEnum::ConditionEnum::Taunting:
+			return pLocal ? pLocal->IsTaunting() : false;
+
+		case BindEnum::ConditionEnum::HasAmmo:
+			// True when the active weapon has at least one round in clip
+			// OR has reserve ammo (clip1 == -1 means weapon uses no clip)
+			if (!pWeapon) return false;
+			{
+				const int iClip = pWeapon->m_iClip1();
+				return iClip == -1 || iClip > 0;
+			}
+		}
+		return false;
+	}
+
+	} // end switch(iType)
+
+	return false;
+}
+
+// ============================================================
+//  GetBinds  — recursive tree walker
+// ============================================================
+static inline void GetBinds(int iParent, CTFPlayer* pLocal, CTFWeaponBase* pWeapon,
+                             std::vector<Bind_t>& vBinds, bool bManage = true)
 {
 	if (vBinds.empty())
 		return;
 
-	for (int i = 0; i < vBinds.size(); i++)
+	for (int i = 0; i < static_cast<int>(vBinds.size()); i++)
 	{
 		auto& tBind = vBinds[i];
 		if (iParent != tBind.m_iParent || !tBind.m_bEnabled)
@@ -56,119 +297,42 @@ static inline void GetBinds(int iParent, CTFPlayer* pLocal, CTFWeaponBase* pWeap
 
 		if (bManage)
 		{
-			switch (tBind.m_iType)
-			{
-			case BindEnum::Key:
-			{
-				bool bKey = false;
-				switch (tBind.m_iInfo)
-				{
-				case BindEnum::KeyEnum::Hold: bKey = U::KeyHandler.Down(tBind.m_iKey, false, &tBind.m_tKeyStorage); break;
-				case BindEnum::KeyEnum::Toggle: bKey = U::KeyHandler.Pressed(tBind.m_iKey, false, &tBind.m_tKeyStorage); break;
-				case BindEnum::KeyEnum::DoubleClick: bKey = U::KeyHandler.Double(tBind.m_iKey, false, &tBind.m_tKeyStorage); break;
-				}
-				bKey &= !s_bUI || s_bMenu && (!F::Menu.m_bWindowHovered || tBind.m_iKey != VK_LBUTTON && tBind.m_iKey != VK_RBUTTON); // allow in menu
+			// ── Evaluate primary event ──────────────────────────────
+			bool bPrimary = EvaluateEventActive(
+				tBind.m_iType, tBind.m_iInfo, tBind.m_iInfoAux,
+				pLocal, pWeapon,
+				&tBind.m_tKeyStorage, tBind.m_iKey,
+				tBind.m_bActive   // toggle state lives here
+			);
+			if (tBind.m_bNot)
+				bPrimary = !bPrimary;
 
-				switch (tBind.m_iInfo)
-				{
-				case BindEnum::KeyEnum::Hold:
-					tBind.m_bActive = bKey;
-					if (tBind.m_bNot)
-						tBind.m_bActive = !tBind.m_bActive;
-					break;
-				case BindEnum::KeyEnum::Toggle:
-				case BindEnum::KeyEnum::DoubleClick:
-					if (bKey)
-						tBind.m_bActive = !tBind.m_bActive;
-				}
-				break;
-			}
-			case BindEnum::Class:
+			// ── Evaluate AND event (if enabled) ────────────────────
+			if (tBind.m_bAndEnabled)
 			{
-				const int iClass = pLocal ? pLocal->m_iClass() : TF_CLASS_UNDEFINED;
-				switch (tBind.m_iInfo)
-				{
-				case BindEnum::ClassEnum::Scout: { tBind.m_bActive = iClass == TF_CLASS_SCOUT; break; }
-				case BindEnum::ClassEnum::Soldier: { tBind.m_bActive = iClass == TF_CLASS_SOLDIER; break; }
-				case BindEnum::ClassEnum::Pyro: { tBind.m_bActive = iClass == TF_CLASS_PYRO; break; }
-				case BindEnum::ClassEnum::Demoman: { tBind.m_bActive = iClass == TF_CLASS_DEMOMAN; break; }
-				case BindEnum::ClassEnum::Heavy: { tBind.m_bActive = iClass == TF_CLASS_HEAVY; break; }
-				case BindEnum::ClassEnum::Engineer: { tBind.m_bActive = iClass == TF_CLASS_ENGINEER; break; }
-				case BindEnum::ClassEnum::Medic: { tBind.m_bActive = iClass == TF_CLASS_MEDIC; break; }
-				case BindEnum::ClassEnum::Sniper: { tBind.m_bActive = iClass == TF_CLASS_SNIPER; break; }
-				case BindEnum::ClassEnum::Spy: { tBind.m_bActive = iClass == TF_CLASS_SPY; break; }
-				}
-				if (tBind.m_bNot)
-					tBind.m_bActive = !tBind.m_bActive;
-				break;
+				// AND condition gets a dummy KeyStorage; AND events
+				// are expected to be stateless (Class/Misc/Health/etc).
+				// If someone puts a Toggle in the AND slot the toggle
+				// state is not persisted between frames — acceptable
+				// since AND-toggles are an edge case.
+				bool bAndActive = false;
+				KeyStorage dummyKS = {};
+				bool bAndActive2   = false; // toggle state for AND (not persisted, see above)
+				bool bAnd = EvaluateEventActive(
+					tBind.m_iAndType, tBind.m_iAndInfo, tBind.m_iAndInfoAux,
+					pLocal, pWeapon,
+					&dummyKS, 0,
+					bAndActive2
+				);
+				if (tBind.m_bAndNot)
+					bAnd = !bAnd;
+
+				// Both must pass
+				tBind.m_bActive = bPrimary && bAnd;
 			}
-			case BindEnum::WeaponType:
+			else
 			{
-				tBind.m_bActive = tBind.m_iInfo == BindEnum::WeaponTypeEnum::Throwable ? G::Throwing : tBind.m_iInfo + 1 == int(SDK::GetWeaponType(pWeapon));
-				if (tBind.m_bNot)
-					tBind.m_bActive = !tBind.m_bActive;
-				break;
-			}
-			case BindEnum::ItemSlot:
-			{
-				tBind.m_bActive = tBind.m_iInfo == (pWeapon ? pWeapon->GetSlot() : -1);
-				if (tBind.m_bNot)
-					tBind.m_bActive = !tBind.m_bActive;
-				break;
-			}
-			case BindEnum::Misc:
-			{
-				switch (tBind.m_iInfo)
-				{
-				case BindEnum::MiscEnum::Spectated:
-				case BindEnum::MiscEnum::SpectatedFirst:
-				case BindEnum::MiscEnum::SpectatedThird:
-				{
-					bool bFirst = false, bThird = false;
-					if (auto pResource = H::Entities.GetResource())
-					{
-						int iLocal = I::EngineClient->GetLocalPlayer();
-						for (int n = 1; n <= I::EngineClient->GetMaxClients(); n++)
-						{
-							auto pPlayer = I::ClientEntityList->GetClientEntity(n)->As<CTFPlayer>();
-
-							if (iLocal == n || pResource->IsFakePlayer(n)
-								|| !pPlayer || !pPlayer->IsPlayer() || pPlayer->IsAlive() || pPlayer->IsDormant()
-								|| pResource->m_iTeam(iLocal) != pResource->m_iTeam(n))
-								continue;
-
-							int iObserverTarget = pPlayer->m_hObserverTarget().GetEntryIndex();
-							int iObserverMode = pPlayer->m_iObserverMode();
-							if (iObserverTarget != iLocal)
-								continue;
-
-							switch (iObserverMode)
-							{
-							case OBS_MODE_FIRSTPERSON: bFirst = true; break;
-							case OBS_MODE_THIRDPERSON: bThird = true; break;
-							}
-						}
-					}
-
-					switch (tBind.m_iInfo)
-					{
-					case BindEnum::MiscEnum::Spectated: tBind.m_bActive = bFirst || bThird; break;
-					case BindEnum::MiscEnum::SpectatedFirst: tBind.m_bActive = bFirst; break;
-					case BindEnum::MiscEnum::SpectatedThird: tBind.m_bActive = bThird; break;
-					}
-					break;
-				}
-				case BindEnum::MiscEnum::Zoomed:
-					tBind.m_bActive = pLocal ? pLocal->InCond(TF_COND_ZOOMED) : false;
-					break;
-				case BindEnum::MiscEnum::Aiming:
-					tBind.m_bActive = pLocal ? pLocal->InCond(TF_COND_AIMING) : false;
-					break;
-				}
-				if (tBind.m_bNot)
-					tBind.m_bActive = !tBind.m_bActive;
-				break;
-			}
+				tBind.m_bActive = bPrimary;
 			}
 		}
 
@@ -183,7 +347,7 @@ static inline void GetBinds(int iParent, CTFPlayer* pLocal, CTFWeaponBase* pWeap
 void CBinds::SetVars(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, bool bManage)
 {
 	s_mVars.clear();
-	s_bUI = I::EngineVGui->IsGameUIVisible() || I::MatSystemSurface->IsCursorVisible() && !I::EngineClient->IsPlayingDemo();
+	s_bUI   = I::EngineVGui->IsGameUIVisible() || I::MatSystemSurface->IsCursorVisible() && !I::EngineClient->IsPlayingDemo();
 	s_bMenu = F::Menu.m_bIsOpen && !ImGui::GetIO().WantTextInput && !F::Menu.m_bInKeybind;
 
 	GetBinds(DEFAULT_BIND, pLocal, pWeapon, m_vBinds, bManage);
@@ -197,7 +361,7 @@ void CBinds::Run()
 	if (G::Unload)
 		return;
 
-	auto pLocal = H::Entities.GetLocal();
+	auto pLocal  = H::Entities.GetLocal();
 	auto pWeapon = H::Entities.GetWeapon();
 
 	for (auto& tBind : m_vBinds)
@@ -207,16 +371,16 @@ void CBinds::Run()
 
 		auto& tKey = tBind.m_tKeyStorage;
 
-		bool bOldIsDown = tKey.m_bIsDown;
-		bool bOldIsPressed = tKey.m_bIsPressed;
-		bool bOldIsDouble = tKey.m_bIsDouble;
+		bool bOldIsDown     = tKey.m_bIsDown;
+		bool bOldIsPressed  = tKey.m_bIsPressed;
+		bool bOldIsDouble   = tKey.m_bIsDouble;
 		bool bOldIsReleased = tKey.m_bIsReleased;
 
 		U::KeyHandler.StoreKey(tBind.m_iKey, &tKey);
 
-		tKey.m_bIsDown = tKey.m_bIsDown || bOldIsDown;
-		tKey.m_bIsPressed = tKey.m_bIsPressed || bOldIsPressed;
-		tKey.m_bIsDouble = tKey.m_bIsDouble || bOldIsDouble;
+		tKey.m_bIsDown     = tKey.m_bIsDown     || bOldIsDown;
+		tKey.m_bIsPressed  = tKey.m_bIsPressed  || bOldIsPressed;
+		tKey.m_bIsDouble   = tKey.m_bIsDouble   || bOldIsDouble;
 		tKey.m_bIsReleased = tKey.m_bIsReleased || bOldIsReleased;
 	}
 
@@ -228,7 +392,6 @@ void CBinds::Run()
 			continue;
 
 		auto& tKey = tBind.m_tKeyStorage;
-
 		U::KeyHandler.StoreKey(tBind.m_iKey, &tKey);
 	}
 }
@@ -237,18 +400,17 @@ void CBinds::Run()
 
 bool CBinds::GetBind(int iID, Bind_t* pBind)
 {
-	if (iID > DEFAULT_BIND && iID < m_vBinds.size())
+	if (iID > DEFAULT_BIND && iID < static_cast<int>(m_vBinds.size()))
 	{
 		*pBind = m_vBinds[iID];
 		return true;
 	}
-
 	return false;
 }
 
 void CBinds::AddBind(int iBind, Bind_t& tBind)
 {
-	if (iBind == DEFAULT_BIND || iBind >= m_vBinds.size())
+	if (iBind == DEFAULT_BIND || iBind >= static_cast<int>(m_vBinds.size()))
 		m_vBinds.push_back(tBind);
 	else
 		m_vBinds[iBind] = tBind;
@@ -264,7 +426,7 @@ static inline void RemoveMain(BaseVar*& pBase, int iBind)
 	std::unordered_map<int, T> mMap = {};
 	for (auto it = pVar->Map.begin(); it != pVar->Map.end(); it++)
 	{
-		int iKey = it->first;
+		int  iKey = it->first;
 		auto tVal = it->second;
 		if (iBind == iKey)
 			continue;
@@ -306,17 +468,17 @@ void CBinds::RemoveBind(int iBind, bool bForce)
 	std::vector<int> vErases = {};
 	std::function<void(int)> fSearchBinds = [&](int iIndex)
 	{
-		for (int iBind = 0; iBind < m_vBinds.size(); iBind++)
+		for (int iBind2 = 0; iBind2 < static_cast<int>(m_vBinds.size()); iBind2++)
 		{
-			auto& tBind = m_vBinds[iBind];
-			if (iIndex == tBind.m_iParent && iIndex != iBind)
-				fSearchBinds(iBind);
+			auto& tBind = m_vBinds[iBind2];
+			if (iIndex == tBind.m_iParent && iIndex != iBind2)
+				fSearchBinds(iBind2);
 		}
 		vErases.push_back(iIndex);
 	};
 	auto fRemoveBind = [&](int iIndex)
 	{
-		if (iIndex < m_vBinds.size())
+		if (iIndex < static_cast<int>(m_vBinds.size()))
 			m_vBinds.erase(std::next(m_vBinds.begin(), iIndex));
 		for (auto& tBind : m_vBinds)
 		{
@@ -351,7 +513,7 @@ void CBinds::RemoveBind(int iBind, bool bForce)
 
 int CBinds::GetParent(int iBind)
 {
-	if (iBind > DEFAULT_BIND && iBind < m_vBinds.size())
+	if (iBind > DEFAULT_BIND && iBind < static_cast<int>(m_vBinds.size()))
 		return m_vBinds[iBind].m_iParent;
 	return DEFAULT_BIND;
 }
@@ -384,7 +546,7 @@ static inline void SwapMain(BaseVar*& pBase, int iBind1, int iBind2)
 	{
 		auto& tVal1 = pVar->Map[iBind1];
 		auto& tVal2 = pVar->Map[iBind2];
-		auto tTemp = tVal1;
+		auto  tTemp = tVal1;
 		tVal1 = tVal2;
 		tVal2 = tTemp;
 	}
@@ -405,17 +567,15 @@ void CBinds::Move(int i1, int i2)
 {
 	auto& tBind1 = m_vBinds[i1];
 	auto& tBind2 = m_vBinds[i2];
-	auto tTemp = tBind1;
+	auto  tTemp  = tBind1;
 	tBind1 = tBind2;
 	tBind2 = tTemp;
 
 	std::vector<Bind_t*> vBinds1, vBinds2;
 	for (auto& tBind : m_vBinds)
 	{
-		if (tBind.m_iParent == i1)
-			vBinds1.push_back(&tBind);
-		else if (tBind.m_iParent == i2)
-			vBinds2.push_back(&tBind);
+		if      (tBind.m_iParent == i1) vBinds1.push_back(&tBind);
+		else if (tBind.m_iParent == i2) vBinds2.push_back(&tBind);
 	}
 	for (auto pBind : vBinds1) pBind->m_iParent = i2;
 	for (auto pBind : vBinds2) pBind->m_iParent = i1;

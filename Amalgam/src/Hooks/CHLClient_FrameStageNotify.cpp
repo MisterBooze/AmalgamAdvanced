@@ -1,4 +1,5 @@
 #include "../SDK/SDK.h"
+#include "../Features/Visuals/Weather/Weather.h"
 
 #include "../Features/Aimbot/Aimbot.h"
 #include "../Features/Backtrack/Backtrack.h"
@@ -61,6 +62,11 @@ MAKE_HOOK(CHLClient_FrameStageNotify, U::Memory.GetVirtual(I::Client, 35), void,
 		break;
 	}
 	case FRAME_RENDER_START:
+		F::Weather.Run();
+		// Gate FlipWorld: alive in-game only
+		G::FlipWorldActive = Vars::Aletherium::Weather::FlipWorld.Value
+			&& I::EngineClient->IsInGame()
+			&& H::Entities.GetLocal() && H::Entities.GetLocal()->IsAlive();
 		for (auto& tBind : F::Binds.m_vBinds)
 		{	// don't drop inputs for binds
 			if (tBind.m_iType != BindEnum::Key)

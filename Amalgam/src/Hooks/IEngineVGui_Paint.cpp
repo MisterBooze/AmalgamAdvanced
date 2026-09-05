@@ -14,6 +14,10 @@
 #include "../Features/PacketManip/AntiAim/AntiAim.h"
 #include "../Features/Aimbot/AutoHeal/AutoHeal.h"
 #include "../Features/Debug/Debug.h"
+#include "../Features/Indicators/Indicators.h"
+#include "../Features/Visuals/FakePOV/FakePOV.h"
+#include "../Features/Visuals/Weather/Weather.h"
+#include "../Features/DiscordRPC/DiscordRPC.h"
 
 MAKE_HOOK(IEngineVGui_Paint, U::Memory.GetVirtual(I::EngineVGui, 14), void,
 	void* rcx, int iMode)
@@ -55,6 +59,11 @@ MAKE_HOOK(IEngineVGui_Paint, U::Memory.GetVirtual(I::EngineVGui, 14), void,
 
 #ifdef DEBUG_INFO
 			F::Debug.Draw(pLocal);
+
+		// ── Aletherium features ──────────────────────────────────────
+		F::Indicators.Draw(pLocal);
+		F::FakePOV.Draw(pLocal);
+		F::DiscordRPC.Update();
 #endif
 		}
 		H::Draw.End();

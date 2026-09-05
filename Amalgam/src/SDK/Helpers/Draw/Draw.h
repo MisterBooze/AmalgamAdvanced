@@ -92,6 +92,9 @@ public:
 	void LineRectOutline(int x, int y, int w, int h, Color_t tColor, Color_t tColorOut = { 0, 0, 0, 255 }, bool bInside = true);
 	void FillRectPercent(int x, int y, int w, int h, float t, Color_t tColor, Color_t tColorOut = { 0, 0, 0, 255 }, EAlign eAlign = ALIGN_LEFT, bool bAdjust = false);
 	void FillRoundRect(int x, int y, int w, int h, int iRadius, Color_t tColor, int iCount = 64);
+	void FillRoundRectSolid(int x, int y, int w, int h, int iRadius, Color_t tColor);
+	void PanelOutline(int x, int y, int w, int h, int iRadius, float flAlpha = 1.f);
+	void StyledPanel(int x, int y, int w, int h, float flAlpha = 1.f);
 	void LineRoundRect(int x, int y, int w, int h, int iRadius, Color_t tColor, int iCount = 64);
 
 	void FillCircle(int x, int y, float iRadius, int iSegments, Color_t tColor);

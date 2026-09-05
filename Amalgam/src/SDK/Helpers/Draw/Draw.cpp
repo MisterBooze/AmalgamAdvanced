@@ -3,6 +3,13 @@
 #include "../../SDK.h"
 #include "../../Definitions/Interfaces.h"
 #include "../../../Utils/Math/Math.h"
+
+#ifndef PI
+static constexpr float PI = 3.14159265358979323846f;
+#endif
+#ifndef DEG2RAD
+#define DEG2RAD(x) ((x) * (PI / 180.f))
+#endif
 #include "../../../Utils/Timer/Timer.h"
 #include "../../../Features/ImGui/Render.h"
 
@@ -624,4 +631,63 @@ void CDraw::RenderWireframeSphere(const Vector& vCenter, float flRadius, int nTh
 	auto pMaterial = bZBuffer ? pWireframe : pWireframeIgnoreZ;
 
 	RenderSphere(vCenter, flRadius, nTheta, nPhi, tColor, pMaterial);
+}
+void CDraw::FillRoundRectSolid(int x, int y, int w, int h, int iRadius, Color_t tColor)
+{
+	iRadius = std::clamp(iRadius, 0, std::min(w, h) / 2);
+	if (iRadius <= 0) { FillRect(x, y, w, h, tColor); return; }
+
+	FillRect(x + iRadius, y,              w - 2 * iRadius, h,              tColor);
+	FillRect(x,           y + iRadius,    iRadius,          h - 2 * iRadius, tColor);
+	FillRect(x + w - iRadius, y + iRadius, iRadius,         h - 2 * iRadius, tColor);
+
+	auto Corner = [&](float cx, float cy, float a0)
+	{
+		std::vector<Vertex_t> v = { { { cx, cy } } };
+		const int seg = 8;
+		for (int i = 0; i <= seg; i++)
+		{
+			const float a = DEG2RAD(a0 + 90.f * float(i) / seg);
+			v.emplace_back(Vector2D{ cx + iRadius * cosf(a), cy + iRadius * sinf(a) });
+		}
+		FillPolygon(v, tColor);
+	};
+	Corner(float(x + iRadius),         float(y + iRadius),         180.f);
+	Corner(float(x + w - iRadius),     float(y + iRadius),         270.f);
+	Corner(float(x + w - iRadius),     float(y + h - iRadius),     0.f);
+	Corner(float(x + iRadius),         float(y + h - iRadius),     90.f);
+}
+
+void CDraw::PanelOutline(int x, int y, int w, int h, int iRadius, float flAlpha)
+{
+	const float fA = std::clamp(flAlpha, 0.f, 1.f);
+	const Color_t tAccent = Vars::Menu::Theme::Accent.Value;
+	// outer glow ring
+	{
+		Color_t c = { tAccent.r, tAccent.g, tAccent.b, (byte)std::clamp(int(30 * fA), 0, 255) };
+		Line(x - 1,     y - 1,     x + w + 1, y - 1,     c);
+		Line(x + w + 1, y - 1,     x + w + 1, y + h + 1, c);
+		Line(x + w + 1, y + h + 1, x - 1,     y + h + 1, c);
+		Line(x - 1,     y + h + 1, x - 1,     y - 1,     c);
+	}
+	// inner shadow ring
+	{
+		Color_t c = { 0, 0, 0, (byte)std::clamp(int(60 * fA), 0, 255) };
+		Line(x,     y,     x + w, y,     c);
+		Line(x + w, y,     x + w, y + h, c);
+		Line(x + w, y + h, x,     y + h, c);
+		Line(x,     y + h, x,     y,     c);
+	}
+}
+
+void CDraw::StyledPanel(int x, int y, int w, int h, float flAlpha)
+{
+	I::MatSystemSurface->DrawSetAlphaMultiplier(1.f);
+	flAlpha = std::clamp(flAlpha, 0.f, 1.f);
+	// No Rounding var in our project — use a fixed 4px radius
+	const int iRadius = int(Scale(4.f));
+	const Color_t c = Vars::Menu::Theme::Background.Value;
+	const Color_t tBg = { c.r, c.g, c.b, (byte)std::clamp(int(c.a * flAlpha), 0, 255) };
+	FillRoundRectSolid(x, y, w, h, iRadius, tBg);
+	PanelOutline(x, y, w, h, iRadius, flAlpha);
 }
