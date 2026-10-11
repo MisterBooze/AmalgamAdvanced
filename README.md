@@ -23,6 +23,6 @@
 
   ##
 
-  Read about Amalgam's documentation and features [here](../../wiki). 
+  Read about Amalgam Advanced's documentation and features [here](../../wiki). 
 
 </div>
